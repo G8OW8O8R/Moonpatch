@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "siteName": "Moonpatch Farm",
+    "title": "Moonpatch Farm — dynie, pączki z cydrem i odrobina strachu",
+    "description": "Przejdź przez bramę małej (i całkiem fikcyjnej) farmy dyń: przytulna kawiarnia, czerwona stodoła pełna jesiennych drobiazgów i sklep ze straszydłami, który potrafi ugryźć."
+  },
+  "gate": {
+    "heading": "Moonpatch Farm",
+    "intro": "Farma dyń na końcu polnej drogi. Brama jest tuż przed tobą.",
+    "posterAlt": "Stara drewniana brama z sierpem księżyca na belce. Za nią czerwona stodoła, kremowa kawiarnia i grafitowy sklep wokół placu pełnego dyń."
+  },
+  "header": {
+    "home": "Moonpatch Farm, powrót do bramy",
+    "language": "Język",
+    "sound": "Dźwięk",
+    "soundOff": "Dźwięk wyłączony",
+    "moons": "Znalezione księżyce: {found} z {total}",
+    "basket": "W taczce: {count}"
+  }
+}

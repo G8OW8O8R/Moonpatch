@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "siteName": "Moonpatch Farm",
+    "title": "Moonpatch Farm — pumpkins, cider donuts & a little fright",
+    "description": "Walk through the gate of a small (and entirely fictional) pumpkin farm: a cozy café, a red barn full of fall goods and a haunt shop that bites back."
+  },
+  "gate": {
+    "heading": "Moonpatch Farm",
+    "intro": "A pumpkin farm at the end of a dirt road. The gate's right in front of you.",
+    "posterAlt": "An old wooden gate with a crescent moon on the crossbeam. Behind it, a red barn, a cream café and a dark gray shop stand around a square full of pumpkins."
+  },
+  "header": {
+    "home": "Moonpatch Farm, back to the gate",
+    "language": "Language",
+    "sound": "Sound",
+    "soundOff": "Sound is off",
+    "moons": "{found} of {total} moons found",
+    "basket": "{count} in your wheelbarrow"
+  }
+}

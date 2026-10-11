@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+/* Only the farm palette, radii and type exist — Tailwind's defaults are cleared
+   so nothing off-brand can slip in through a utility class. */
+@theme {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-ink: #2b211c;
+  --color-paper: #f5f0e8;
+  --color-cream: #f3e9d6;
+  --color-bark: #3a2a1f;
+  --color-pumpkin: #d9692a;
+  --color-pumpkin-light: #e07a35;
+
+  --font-*: initial;
+  --font-display: var(--font-fraunces), "Iowan Old Style", Georgia, serif;
+  --font-sans: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-hand: var(--font-caveat), "Segoe Print", cursive;
+
+  /* One spacing scale: every step is a multiple of 4px, layout steps of 8px. */
+  --spacing: 0.25rem;
+  --spacing-gutter: clamp(1rem, 2.8vw, 3.5rem);
+
+  --radius-*: initial;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+
+  --text-ui: 1rem;
+  --text-ui--line-height: 1.5;
+  --text-ui-lg: 1.0625rem;
+  --text-ui-lg--line-height: 1.5;
+
+  /* Paper-coloured type over photographs. */
+  --text-shadow-soft: 0 0 1px rgb(43 33 28 / 0.85), 0 0 3px rgb(43 33 28 / 0.7), 0 1px 8px rgb(43 33 28 / 0.5);
+  --drop-shadow-soft: 0 0 1px rgb(43 33 28 / 0.8), 0 0 3px rgb(43 33 28 / 0.6), 0 1px 8px rgb(43 33 28 / 0.45);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+    background: var(--color-bark);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100svh;
+    background: var(--color-bark);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: var(--color-pumpkin);
+    color: var(--color-paper);
+  }
+
+  /* A pumpkin ring with a paper halo stays visible on bright sky and dark wood alike. */
+  :focus-visible {
+    outline: 2px solid var(--color-pumpkin);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 3px var(--color-paper);
+    border-radius: var(--radius-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: var(--duration-reduced, 150ms) !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: var(--duration-reduced, 150ms) !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Single-colour SVGs from /public drawn in currentColor, files left untouched. */
+  .mask-icon {
+    display: inline-block;
+    flex: none;
+    width: 1.25em;
+    height: 1.25em;
+    background-color: currentColor;
+    mask: var(--mask) center / contain no-repeat;
+  }
+
+  .site-header {
+    --logo-width: clamp(140px, 16vw, 300px);
+    --logo-height: calc(var(--logo-width) * 2746.75 / 8789);
+  }
+
+  /* A darker band of sky behind the header only, so paper type holds its
+     contrast on a bright golden-hour sky. Eased stops: no visible edge. */
+  .site-header::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: -1;
+    height: calc(var(--logo-height) + var(--spacing-gutter) * 3);
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgb(43 33 28 / 0.7) 0%,
+      rgb(43 33 28 / 0.64) 25%,
+      rgb(43 33 28 / 0.48) 50%,
+      rgb(43 33 28 / 0.24) 70%,
+      rgb(43 33 28 / 0.08) 87%,
+      rgb(43 33 28 / 0) 100%
+    );
+
+    @media (width < 40rem) {
+      /* Phones carry a second line (sound) under the counters. */
+      height: 9rem;
+    }
+  }
+
+  /* The wordmark file stays as delivered; it is painted in paper through a mask. */
+  .wordmark {
+    width: var(--logo-width);
+    height: var(--logo-height);
+    background-color: currentColor;
+    mask: url(/brand/wordmark.svg) center / contain no-repeat;
+  }
+
+  /* Centre the status row on the "Moonpatch" line of the wordmark. */
+  .status-row {
+    min-height: 2rem;
+    margin-top: max(0px, calc(var(--logo-height) * 0.27 - 1rem));
+  }
+}

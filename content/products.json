@@ -218,7 +218,7 @@
     },
     {
       "id": "13-zombie-mask",
-      "building": "shop",
+      "building": "haunt",
       "card": "tag",
       "image": "/products/13-zombie-mask",
       "price": {
@@ -236,7 +236,7 @@
     },
     {
       "id": "14-witch-hat",
-      "building": "shop",
+      "building": "haunt",
       "card": "tag",
       "image": "/products/14-witch-hat",
       "price": {
@@ -254,7 +254,7 @@
     },
     {
       "id": "15-glowing-skull",
-      "building": "shop",
+      "building": "haunt",
       "card": "tag",
       "image": "/products/15-glowing-skull",
       "price": {
@@ -272,7 +272,7 @@
     },
     {
       "id": "16-cauldron",
-      "building": "shop",
+      "building": "haunt",
       "card": "tag",
       "image": "/products/16-cauldron",
       "price": {
@@ -290,7 +290,7 @@
     },
     {
       "id": "17-little-skeleton",
-      "building": "shop",
+      "building": "haunt",
       "card": "tag",
       "image": "/products/17-little-skeleton",
       "price": {
@@ -308,7 +308,7 @@
     },
     {
       "id": "18-jack-o-lantern-lamp",
-      "building": "shop",
+      "building": "haunt",
       "card": "tag",
       "image": "/products/18-jack-o-lantern-lamp",
       "price": {
@@ -326,7 +326,7 @@
     },
     {
       "id": "19-mystery-box",
-      "building": "shop",
+      "building": "haunt",
       "card": "tag",
       "image": "/products/19-mystery-box",
       "price": {
