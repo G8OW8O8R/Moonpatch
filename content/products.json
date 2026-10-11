@@ -1,0 +1,346 @@
+{
+  "products": [
+    {
+      "id": "01-pumpkin-spice-latte",
+      "building": "cafe",
+      "card": "recipe",
+      "image": "/products/01-pumpkin-spice-latte",
+      "price": {
+        "usd": 6.5,
+        "pln": 24
+      },
+      "name": {
+        "en": "Pumpkin Spice Latte",
+        "pl": "Pumpkin Spice Latte"
+      },
+      "description": {
+        "en": "Espresso, steamed milk, real roasted pumpkin and our own spice blend. Cinnamon on top, always.",
+        "pl": "Espresso, spienione mleko, prawdziwa pieczona dynia i nasza mieszanka przypraw. Zawsze z cynamonem na wierzchu."
+      }
+    },
+    {
+      "id": "02-cider-donuts",
+      "building": "cafe",
+      "card": "recipe",
+      "image": "/products/02-cider-donuts",
+      "price": {
+        "usd": 4.0,
+        "pln": 15
+      },
+      "name": {
+        "en": "Cider Donuts (3)",
+        "pl": "Pączki cydrowe (3)"
+      },
+      "description": {
+        "en": "Made with pressed apple cider, rolled warm in cinnamon sugar.",
+        "pl": "Na tłoczonym cydrze jabłkowym, obtaczane na ciepło w cukrze z cynamonem."
+      }
+    },
+    {
+      "id": "03-cinnamon-rolls",
+      "building": "cafe",
+      "card": "recipe",
+      "image": "/products/03-cinnamon-rolls",
+      "price": {
+        "usd": 7.0,
+        "pln": 26
+      },
+      "name": {
+        "en": "Cinnamon Rolls (2)",
+        "pl": "Cynamonki (2)"
+      },
+      "description": {
+        "en": "Slow-proofed overnight, finished with a cream cheese glaze that won't stay put.",
+        "pl": "Wyrastają przez całą noc, polane lukrem z serka, który nigdy nie zostaje na miejscu."
+      }
+    },
+    {
+      "id": "04-pumpkin-pie",
+      "building": "cafe",
+      "card": "recipe",
+      "image": "/products/04-pumpkin-pie",
+      "price": {
+        "usd": 24.0,
+        "pln": 89
+      },
+      "name": {
+        "en": "Whole Pumpkin Pie",
+        "pl": "Całe ciasto dyniowe"
+      },
+      "description": {
+        "en": "Hand-crimped butter crust, silky spiced filling. Serves eight, or two honest people.",
+        "pl": "Ręcznie zaplatany kruchy spód i aksamitne, korzenne nadzienie. Dla ośmiu osób albo dwóch szczerych."
+      }
+    },
+    {
+      "id": "05-pumpkin-butter",
+      "building": "cafe",
+      "card": "tag",
+      "image": "/products/05-pumpkin-butter",
+      "price": {
+        "usd": 12.0,
+        "pln": 45
+      },
+      "name": {
+        "en": "Pumpkin Butter",
+        "pl": "Masło dyniowe"
+      },
+      "description": {
+        "en": "Slow-cooked pumpkin, maple and clove. For toast, oatmeal or a spoon.",
+        "pl": "Długo gotowana dynia z syropem klonowym i goździkiem. Na tosty, do owsianki albo prosto z łyżki."
+      }
+    },
+    {
+      "id": "06-coffee-beans",
+      "building": "cafe",
+      "card": "tag",
+      "image": "/products/06-coffee-beans",
+      "price": {
+        "usd": 16.0,
+        "pln": 59
+      },
+      "name": {
+        "en": "Harvest Roast Coffee, 340 g",
+        "pl": "Kawa Harvest Roast, 340 g"
+      },
+      "description": {
+        "en": "Medium roast with notes of toffee, baked apple and a little smoke.",
+        "pl": "Średnio palona, z nutą toffi, pieczonego jabłka i odrobiną dymu."
+      }
+    },
+    {
+      "id": "07-plaid-blanket",
+      "building": "barn",
+      "card": "tag",
+      "image": "/products/07-plaid-blanket",
+      "price": {
+        "usd": 89.0,
+        "pln": 349
+      },
+      "name": {
+        "en": "Wool Plaid Throw",
+        "pl": "Wełniany koc w kratę"
+      },
+      "description": {
+        "en": "Heavy brushed wool in rust, cream and charcoal. Made for porches and long evenings.",
+        "pl": "Gruba czesana wełna w kolorach rdzy, kremu i grafitu. Na ganek i długie wieczory."
+      }
+    },
+    {
+      "id": "08-dried-wreath",
+      "building": "barn",
+      "card": "tag",
+      "image": "/products/08-dried-wreath",
+      "price": {
+        "usd": 64.0,
+        "pln": 249
+      },
+      "name": {
+        "en": "Dried Harvest Wreath",
+        "pl": "Wieniec z suszu"
+      },
+      "description": {
+        "en": "Eucalyptus, wheat and hydrangea, hand-tied in the barn. Lasts all season.",
+        "pl": "Eukaliptus, pszenica i hortensja, wiązane ręcznie w stodole. Wytrzyma cały sezon."
+      }
+    },
+    {
+      "id": "09-ceramic-pumpkins",
+      "building": "barn",
+      "card": "tag",
+      "image": "/products/09-ceramic-pumpkins",
+      "price": {
+        "usd": 48.0,
+        "pln": 189
+      },
+      "name": {
+        "en": "Ceramic Pumpkins, set of 3",
+        "pl": "Ceramiczne dynie, zestaw 3 szt."
+      },
+      "description": {
+        "en": "Matte cream, sage and terracotta glazes with real dried stems.",
+        "pl": "Matowe szkliwa w kremie, szałwii i terakocie, z prawdziwymi suszonymi ogonkami."
+      }
+    },
+    {
+      "id": "10-amber-candle",
+      "building": "barn",
+      "card": "tag",
+      "image": "/products/10-amber-candle",
+      "price": {
+        "usd": 28.0,
+        "pln": 109
+      },
+      "name": {
+        "en": "Hayloft Candle",
+        "pl": "Świeca Hayloft"
+      },
+      "description": {
+        "en": "Soy wax in amber glass. Smells like cedar, dry hay and the first cold night.",
+        "pl": "Wosk sojowy w bursztynowym szkle. Pachnie cedrem, suchym sianem i pierwszą zimną nocą."
+      }
+    },
+    {
+      "id": "11-stoneware-mug",
+      "building": "barn",
+      "card": "tag",
+      "image": "/products/11-stoneware-mug",
+      "price": {
+        "usd": 24.0,
+        "pln": 95
+      },
+      "name": {
+        "en": "Speckled Stoneware Mug",
+        "pl": "Kubek z nakrapianej kamionki"
+      },
+      "description": {
+        "en": "Hand-thrown, so no two are quite alike. Holds a generous latte.",
+        "pl": "Toczony ręcznie, więc żadne dwa nie są identyczne. Zmieści solidne latte."
+      }
+    },
+    {
+      "id": "12-beeswax-tapers",
+      "building": "barn",
+      "card": "tag",
+      "image": "/products/12-beeswax-tapers",
+      "price": {
+        "usd": 18.0,
+        "pln": 69
+      },
+      "name": {
+        "en": "Beeswax Tapers, bundle of 8",
+        "pl": "Świece z wosku pszczelego, 8 szt."
+      },
+      "description": {
+        "en": "Hand-dipped in honey and pumpkin tones. Burn slow and clean.",
+        "pl": "Maczane ręcznie, w odcieniach miodu i dyni. Palą się wolno i czysto."
+      }
+    },
+    {
+      "id": "13-zombie-mask",
+      "building": "shop",
+      "card": "tag",
+      "image": "/products/13-zombie-mask",
+      "price": {
+        "usd": 45.0,
+        "pln": 179
+      },
+      "name": {
+        "en": "Latex Zombie Mask",
+        "pl": "Lateksowa maska zombie"
+      },
+      "description": {
+        "en": "Full-head latex, hand-painted. Stitches included, dignity not.",
+        "pl": "Lateks na całą głowę, malowany ręcznie. Szwy w zestawie, godność nie."
+      }
+    },
+    {
+      "id": "14-witch-hat",
+      "building": "shop",
+      "card": "tag",
+      "image": "/products/14-witch-hat",
+      "price": {
+        "usd": 32.0,
+        "pln": 125
+      },
+      "name": {
+        "en": "Crooked Witch Hat",
+        "pl": "Krzywy kapelusz wiedźmy"
+      },
+      "description": {
+        "en": "Aged canvas, tattered band, tarnished brass buckle. Already looks a hundred years old.",
+        "pl": "Postarzane płótno, postrzępiona opaska i zaśniedziała mosiężna klamra. Wygląda na sto lat."
+      }
+    },
+    {
+      "id": "15-glowing-skull",
+      "building": "shop",
+      "card": "tag",
+      "image": "/products/15-glowing-skull",
+      "price": {
+        "usd": 22.0,
+        "pln": 85
+      },
+      "name": {
+        "en": "Glowing Skull",
+        "pl": "Świecąca czaszka"
+      },
+      "description": {
+        "en": "Warm LED inside, so the eye sockets glow like embers.",
+        "pl": "Ciepły LED w środku sprawia, że oczodoły żarzą się jak węgielki."
+      }
+    },
+    {
+      "id": "16-cauldron",
+      "building": "shop",
+      "card": "tag",
+      "image": "/products/16-cauldron",
+      "price": {
+        "usd": 38.0,
+        "pln": 149
+      },
+      "name": {
+        "en": "Bubbling Cauldron",
+        "pl": "Bulgoczący kociołek"
+      },
+      "description": {
+        "en": "Green glow, real mist. Add water and the potion does the rest.",
+        "pl": "Zielona poświata i prawdziwa mgła. Wystarczy dolać wody, resztę zrobi wywar."
+      }
+    },
+    {
+      "id": "17-little-skeleton",
+      "building": "shop",
+      "card": "tag",
+      "image": "/products/17-little-skeleton",
+      "price": {
+        "usd": 19.0,
+        "pln": 75
+      },
+      "name": {
+        "en": "Poseable Skeleton, 40 cm",
+        "pl": "Ruchomy szkielet, 40 cm"
+      },
+      "description": {
+        "en": "Every joint moves. Sits on shelves, mantels and bad decisions.",
+        "pl": "Rusza się każdy staw. Usiądzie na półce, kominku i każdym złym pomyśle."
+      }
+    },
+    {
+      "id": "18-jack-o-lantern-lamp",
+      "building": "shop",
+      "card": "tag",
+      "image": "/products/18-jack-o-lantern-lamp",
+      "price": {
+        "usd": 42.0,
+        "pln": 165
+      },
+      "name": {
+        "en": "Grinning Jack Lamp",
+        "pl": "Lampa Szczerząca się Dynia"
+      },
+      "description": {
+        "en": "Hand-carved foam that never rots. Plug in and let it grin.",
+        "pl": "Ręcznie rzeźbiona pianka, która nigdy nie gnije. Podłącz i daj jej się szczerzyć."
+      }
+    },
+    {
+      "id": "19-mystery-box",
+      "building": "shop",
+      "card": "tag",
+      "image": "/products/19-mystery-box",
+      "price": {
+        "usd": 50.0,
+        "pln": 199
+      },
+      "name": {
+        "en": "Moonpatch Mystery Box",
+        "pl": "Moonpatch Mystery Box"
+      },
+      "description": {
+        "en": "Something from every building, chosen by us. Don't shake it.",
+        "pl": "Coś z każdego budynku, wybrane przez nas. Nie potrząsaj."
+      }
+    }
+  ]
+}
