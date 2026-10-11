@@ -37,12 +37,6 @@
   /* The header sits on photographs without a backdrop, so its type gets more room. */
   --text-header: clamp(15px, 1vw, 19px);
   --text-header--line-height: 1.5;
-
-  /* Ink hugging paper-coloured marks on a photograph: dense at the edge of
-     each glyph, gone a few pixels out, so the sky stays golden. */
-  --text-shadow-hug:
-    0 0 1px rgb(43 33 28), 0 0 1px rgb(43 33 28), 0 0 1px rgb(43 33 28), 0 0 2px rgb(43 33 28 / 0.9),
-    0 0 2px rgb(43 33 28 / 0.9), 0 0 4px rgb(43 33 28 / 0.55), 0 0 8px rgb(43 33 28 / 0.3);
 }
 
 @layer base {
@@ -89,12 +83,42 @@
   }
 }
 
-/* Same hug for icons and the wordmark. Written out by hand: a theme value would
-   collapse the list into a single drop-shadow(). Chained shadows compound, so
+/* Header colour follows the scene: ink over the bright gate, paper over dusk,
+   interiors and panels. A scene opts in with data-header on <html> or on any
+   element inside the page; paper wins when both are present. */
+:root {
+  --header-ink: var(--color-ink);
+  --header-halo: var(--color-paper);
+}
+
+:root[data-header="paper"],
+:root:has([data-header="paper"]) {
+  --header-ink: var(--color-paper);
+  --header-halo: var(--color-ink);
+}
+
+/* A halo in the opposite colour hugging each mark: dense at the glyph edge,
+   gone a few pixels out, so the photograph stays untouched around it. */
+@utility text-shadow-hug {
+  --h: var(--header-halo);
+  text-shadow:
+    0 0 1px var(--h),
+    0 0 1px var(--h),
+    0 0 1px var(--h),
+    0 0 2px var(--h),
+    0 0 2px var(--h),
+    0 0 3px var(--h),
+    0 0 4px color-mix(in srgb, var(--h) 60%, transparent),
+    0 0 8px color-mix(in srgb, var(--h) 30%, transparent);
+}
+
+/* The same hug for icons and the wordmark. Chained drop shadows compound, so
    each step is lighter than its text counterpart. */
 @utility drop-shadow-hug {
-  filter: drop-shadow(0 0 0.5px rgb(43 33 28)) drop-shadow(0 0 1px rgb(43 33 28 / 0.85))
-    drop-shadow(0 0 2px rgb(43 33 28 / 0.6)) drop-shadow(0 0 5px rgb(43 33 28 / 0.3));
+  --h: var(--header-halo);
+  filter: drop-shadow(0 0 0.5px var(--h)) drop-shadow(0 0 1px var(--h))
+    drop-shadow(0 0 2px color-mix(in srgb, var(--h) 80%, transparent))
+    drop-shadow(0 0 5px color-mix(in srgb, var(--h) 30%, transparent));
 }
 
 @layer components {
@@ -111,9 +135,12 @@
   .site-header {
     --logo-width: clamp(140px, 16vw, 300px);
     --logo-height: calc(var(--logo-width) * 2746.75 / 8789);
+    /* Only the colour travels between scenes; the halo and its filters switch at once. */
+    color: var(--header-ink);
+    transition: color var(--duration-scene-short) var(--ease-in-out);
   }
 
-  /* The wordmark file stays as delivered; it is painted in paper through a mask. */
+  /* The wordmark file stays as delivered; it is painted in the header colour through a mask. */
   .wordmark {
     width: var(--logo-width);
     height: var(--logo-height);

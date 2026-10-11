@@ -19,7 +19,7 @@ export function SiteHeader({ lang, t }: { lang: Locale; t: Messages["header"] })
   const basketCount = 0;
 
   return (
-    <header className="site-header pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-4 px-gutter pt-gutter text-paper">
+    <header className="site-header pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-4 px-gutter pt-gutter">
       <Link
         href={`/${lang}`}
         aria-label={t.home}

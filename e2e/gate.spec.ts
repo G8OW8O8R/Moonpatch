@@ -50,6 +50,9 @@ test.describe("gate poster", () => {
         .evaluateAll((links) => links.map((link) => link.getAttribute("imagesrcset") ?? ""));
       expect(preloaded.some((srcset) => srcset.includes(`/img/plates/${plate}-`))).toBe(true);
 
+      // Over the bright gate the header is drawn in ink.
+      await expect(page.locator("header")).toHaveCSS("color", "rgb(43, 33, 28)");
+
       for (const label of ["EN", "PL"]) {
         await expect(
           page.getByRole("navigation").getByRole("link", { name: new RegExp(`^${label}`) }),

@@ -27,7 +27,7 @@ export default async function GatePage({ params }: PageProps<"/[lang]">) {
 
   return (
     <main>
-      <section aria-labelledby="gate-heading" className="relative h-svh overflow-hidden bg-bark">
+      <section aria-labelledby="gate-heading" data-header="ink" className="relative h-svh overflow-hidden bg-bark">
         <GatePoster alt={gate.posterAlt} />
         <div className="sr-only">
           <h1 id="gate-heading">{gate.heading}</h1>
