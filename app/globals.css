@@ -34,9 +34,15 @@
   --text-ui-lg: 1.0625rem;
   --text-ui-lg--line-height: 1.5;
 
-  /* Paper-coloured type over photographs. */
-  --text-shadow-soft: 0 0 1px rgb(43 33 28 / 0.85), 0 0 3px rgb(43 33 28 / 0.7), 0 1px 8px rgb(43 33 28 / 0.5);
-  --drop-shadow-soft: 0 0 1px rgb(43 33 28 / 0.8), 0 0 3px rgb(43 33 28 / 0.6), 0 1px 8px rgb(43 33 28 / 0.45);
+  /* The header sits on photographs without a backdrop, so its type gets more room. */
+  --text-header: clamp(15px, 1vw, 19px);
+  --text-header--line-height: 1.5;
+
+  /* Ink hugging paper-coloured marks on a photograph: dense at the edge of
+     each glyph, gone a few pixels out, so the sky stays golden. */
+  --text-shadow-hug:
+    0 0 1px rgb(43 33 28), 0 0 1px rgb(43 33 28), 0 0 1px rgb(43 33 28), 0 0 2px rgb(43 33 28 / 0.9),
+    0 0 2px rgb(43 33 28 / 0.9), 0 0 4px rgb(43 33 28 / 0.55), 0 0 8px rgb(43 33 28 / 0.3);
 }
 
 @layer base {
@@ -83,6 +89,14 @@
   }
 }
 
+/* Same hug for icons and the wordmark. Written out by hand: a theme value would
+   collapse the list into a single drop-shadow(). Chained shadows compound, so
+   each step is lighter than its text counterpart. */
+@utility drop-shadow-hug {
+  filter: drop-shadow(0 0 0.5px rgb(43 33 28)) drop-shadow(0 0 1px rgb(43 33 28 / 0.85))
+    drop-shadow(0 0 2px rgb(43 33 28 / 0.6)) drop-shadow(0 0 5px rgb(43 33 28 / 0.3));
+}
+
 @layer components {
   /* Single-colour SVGs from /public drawn in currentColor, files left untouched. */
   .mask-icon {
@@ -97,31 +111,6 @@
   .site-header {
     --logo-width: clamp(140px, 16vw, 300px);
     --logo-height: calc(var(--logo-width) * 2746.75 / 8789);
-  }
-
-  /* A darker band of sky behind the header only, so paper type holds its
-     contrast on a bright golden-hour sky. Eased stops: no visible edge. */
-  .site-header::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto;
-    z-index: -1;
-    height: calc(var(--logo-height) + var(--spacing-gutter) * 3);
-    pointer-events: none;
-    background: linear-gradient(
-      to bottom,
-      rgb(43 33 28 / 0.7) 0%,
-      rgb(43 33 28 / 0.64) 25%,
-      rgb(43 33 28 / 0.48) 50%,
-      rgb(43 33 28 / 0.24) 70%,
-      rgb(43 33 28 / 0.08) 87%,
-      rgb(43 33 28 / 0) 100%
-    );
-
-    @media (width < 40rem) {
-      /* Phones carry a second line (sound) under the counters. */
-      height: 9rem;
-    }
   }
 
   /* The wordmark file stays as delivered; it is painted in paper through a mask. */

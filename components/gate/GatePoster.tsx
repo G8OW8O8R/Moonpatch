@@ -1,49 +1,64 @@
 import { preload } from "react-dom";
-import { GATE_ANCHOR, PLATE, coverSizes, objectPosition } from "@/lib/plate-box";
+import {
+  PLATE,
+  TALL_MEDIA,
+  WIDE_MEDIA,
+  type PosterPlate,
+  coverSizes,
+  objectPosition,
+  posterPlates,
+} from "@/lib/plate-box";
 
-const base = "/img/plates/gate";
-const srcSet = (format: "avif" | "webp") => `${base}-1600.${format} 1600w, ${base}-2576.${format} 2576w`;
-const sizes = coverSizes(PLATE);
+const variants = (plate: PosterPlate) => {
+  const { size, anchor } = posterPlates[plate];
+  const base = `/img/plates/${plate}`;
+  const srcSet = (format: "avif" | "webp") => `${base}-1600.${format} 1600w, ${base}-${size.width}.${format} ${size.width}w`;
+  return { base, srcSet, sizes: coverSizes(size), position: objectPosition(anchor) };
+};
 
-/** Average colour of the dirt road along the plate's bottom edge. */
-const ROAD = "#7a5c48";
+const wide = variants("gate");
+const tall = variants("gate-tall");
 
 /**
- * The gate at golden hour, cover-fitted with the shared plate geometry: the
- * first frame of the page and its largest paint. Variants are pre-encoded by
- * `pnpm images`, so this is a plain <picture> rather than a runtime optimiser.
- *
- * Chromium never reports an image that covers the entire viewport as the
- * largest contentful paint (it reads as a background), so the poster stops one
- * pixel short of the bottom edge; the road colour underneath hides the seam.
- * Overlays should take their geometry from the image's own rect.
+ * The gate at golden hour: the first frame of the page. Landscape and squarish
+ * screens get gate.jpg, portrait phones the tall plate of the same scene. Both
+ * are cover-fitted with the shared plate geometry; the variants are
+ * pre-encoded by `pnpm images`, so this is a plain <picture>.
  */
 export function GatePoster({ alt }: { alt: string }) {
-  preload(`${base}-1600.avif`, {
-    as: "image",
-    type: "image/avif",
-    imageSrcSet: srcSet("avif"),
-    imageSizes: sizes,
-    fetchPriority: "high",
-  });
+  for (const [variant, media] of [
+    [wide, WIDE_MEDIA],
+    [tall, TALL_MEDIA],
+  ] as const) {
+    preload(`${variant.base}-1600.avif`, {
+      as: "image",
+      type: "image/avif",
+      media,
+      imageSrcSet: variant.srcSet("avif"),
+      imageSizes: variant.sizes,
+      fetchPriority: "high",
+    });
+  }
 
   return (
-    <div className="absolute inset-0" style={{ backgroundColor: ROAD }}>
+    <>
+      <style>{`.gate-poster{object-position:${wide.position}}@media ${TALL_MEDIA}{.gate-poster{object-position:${tall.position}}}`}</style>
       <picture>
-        <source type="image/avif" srcSet={srcSet("avif")} sizes={sizes} />
-        <source type="image/webp" srcSet={srcSet("webp")} sizes={sizes} />
+        <source media={TALL_MEDIA} type="image/avif" srcSet={tall.srcSet("avif")} sizes={tall.sizes} />
+        <source media={TALL_MEDIA} type="image/webp" srcSet={tall.srcSet("webp")} sizes={tall.sizes} />
+        <source type="image/avif" srcSet={wide.srcSet("avif")} sizes={wide.sizes} />
+        <source type="image/webp" srcSet={wide.srcSet("webp")} sizes={wide.sizes} />
         <img
-          src={`${base}-1600.webp`}
+          src={`${wide.base}-1600.webp`}
           alt={alt}
           width={PLATE.width}
           height={PLATE.height}
           fetchPriority="high"
           decoding="sync"
           draggable={false}
-          className="absolute inset-x-0 top-0 h-[calc(100%-1px)] w-full object-cover select-none"
-          style={{ objectPosition: objectPosition(GATE_ANCHOR) }}
+          className="gate-poster absolute inset-0 size-full object-cover select-none"
         />
       </picture>
-    </div>
+    </>
   );
 }

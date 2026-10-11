@@ -1,7 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-const PLATE_RATIO = 2576 / 1438;
-
 test.describe("gate poster", () => {
   test("the front door picks the visitor's language", async ({ browser }) => {
     for (const [locale, expected] of [
@@ -18,53 +16,44 @@ test.describe("gate poster", () => {
     }
   });
 
-  for (const viewport of [
-    { width: 1536, height: 864 },
-    { width: 1920, height: 1080 },
-    { width: 390, height: 844 },
+  for (const { viewport, plate, ratio } of [
+    { viewport: { width: 1536, height: 864 }, plate: "gate", ratio: 2576 / 1438 },
+    { viewport: { width: 1920, height: 1080 }, plate: "gate", ratio: 2576 / 1438 },
+    { viewport: { width: 390, height: 844 }, plate: "gate-tall", ratio: 2552 / 4577 },
   ]) {
-    test(`fills ${viewport.width}×${viewport.height} without stretching and is the largest paint`, async ({
-      page,
-    }) => {
+    test(`fills ${viewport.width}×${viewport.height} with ${plate} without stretching`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await page.goto("/en");
 
       const poster = page.locator("main picture img");
       await expect(poster).toBeVisible();
-      await expect.poll(() => poster.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBeGreaterThan(0);
+      await expect
+        .poll(() => poster.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth))
+        .toBeGreaterThan(0);
 
-      // Edge to edge; at most the one-pixel seam at the bottom that keeps it measurable.
-      const box = await poster.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box?.x).toBe(0);
-      expect(box?.y).toBe(0);
-      expect(box?.width).toBe(viewport.width);
-      expect(viewport.height - (box?.height ?? 0)).toBeLessThanOrEqual(1);
+      expect(await poster.boundingBox()).toEqual({ x: 0, y: 0, width: viewport.width, height: viewport.height });
 
       const fit = await poster.evaluate((img: HTMLImageElement) => ({
         objectFit: getComputedStyle(img).objectFit,
         ratio: img.naturalWidth / img.naturalHeight,
         source: img.currentSrc,
+        priority: img.getAttribute("fetchpriority"),
       }));
       expect(fit.objectFit).toBe("cover");
-      expect(Math.abs(fit.ratio / PLATE_RATIO - 1)).toBeLessThan(0.005);
-      expect(fit.source).toMatch(/\/img\/plates\/gate-\d+\.(avif|webp)$/);
+      expect(Math.abs(fit.ratio / ratio - 1)).toBeLessThan(0.005);
+      expect(new URL(fit.source).pathname).toMatch(new RegExp(`^/img/plates/${plate}-\\d+\\.(avif|webp)$`));
+      expect(fit.priority).toBe("high");
 
-      const lcp = await page.evaluate(
-        () =>
-          new Promise<string>((resolve) => {
-            new PerformanceObserver((list) => {
-              const last = list.getEntries().at(-1) as (PerformanceEntry & { element?: Element | null }) | undefined;
-              resolve(last?.element?.tagName ?? "none");
-            }).observe({ type: "largest-contentful-paint", buffered: true });
-          }),
-      );
-      expect(lcp).toBe("IMG");
+      // The poster is requested from the head, ahead of scripts and fonts.
+      const preloaded = await page
+        .locator('link[rel="preload"][as="image"][fetchpriority="high"]')
+        .evaluateAll((links) => links.map((link) => link.getAttribute("imagesrcset") ?? ""));
+      expect(preloaded.some((srcset) => srcset.includes(`/img/plates/${plate}-`))).toBe(true);
 
       for (const label of ["EN", "PL"]) {
-        await expect(page.getByRole("navigation").getByRole("link", { name: new RegExp(`^${label}`) })).toBeInViewport({
-          ratio: 1,
-        });
+        await expect(
+          page.getByRole("navigation").getByRole("link", { name: new RegExp(`^${label}`) }),
+        ).toBeInViewport({ ratio: 1 });
       }
     });
   }

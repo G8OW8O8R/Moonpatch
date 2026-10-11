@@ -5,6 +5,7 @@
  *   pnpm images --force    rebuild everything
  *
  * public/plates/<name>.jpg → public/img/plates/<name>-<width>.{avif,webp}
+ * at the plate's full width (2576 landscape, 2552 portrait) and at 1600px.
  * Sources are never modified.
  */
 import { mkdir, readdir, stat } from "node:fs/promises";
@@ -15,7 +16,7 @@ const root = process.cwd();
 const sourceDir = join(root, "public", "plates");
 const outDir = join(root, "public", "img", "plates");
 
-const widths = [2576, 1600] as const;
+const reducedWidth = 1600;
 
 const encoders = {
   avif: (image: Sharp) => image.avif({ quality: 56, effort: 6, chromaSubsampling: "4:4:4" }),
@@ -46,10 +47,11 @@ async function main() {
     const sourceMtime = (await stat(source)).mtimeMs;
     const { width: sourceWidth = 0 } = await sharp(source).metadata();
 
-    for (const width of widths) {
-      if (width > sourceWidth) {
-        throw new Error(`${file} is ${sourceWidth}px wide, cannot make a ${width}px variant`);
-      }
+    if (sourceWidth < reducedWidth) {
+      throw new Error(`${file} is ${sourceWidth}px wide, narrower than the ${reducedWidth}px variant`);
+    }
+
+    for (const width of [sourceWidth, reducedWidth]) {
       for (const [format, encode] of Object.entries(encoders)) {
         const output = join(outDir, `${name}-${width}.${format}`);
         if (await isFresh(output, sourceMtime)) continue;

@@ -43,10 +43,36 @@ export interface PlateBox {
 
 export const PLATE: Readonly<Size> = { width: 2576, height: 1438 };
 
+/** Portrait gate plate: the same scene and scale, with more sky and road. */
+export const PLATE_TALL: Readonly<Size> = { width: 2552, height: 4577 };
+
+/** gate.jpg pixel (x, y) is gate-tall.jpg pixel (x + offset.x, y + offset.y). */
+export const TALL_OFFSET: Readonly<{ x: number; y: number }> = { x: -10, y: 1671 };
+
 export const CENTER: Readonly<Anchor> = { x: 0.5, y: 0.5 };
 
 /** Keeps the moon sign and the latch of the gate in frame on tall screens. */
 export const GATE_ANCHOR: Readonly<Anchor> = { x: 0.5, y: 0.55 };
+
+/**
+ * Centred between the two gate posts (gate.jpg x 271–2354) so both stay in
+ * frame on a 390×844 phone; vertically biased towards the gate over the sky.
+ */
+export const GATE_TALL_ANCHOR: Readonly<Anchor> = { x: 0.561, y: 0.6 };
+
+/** Screens narrower than 4:5 get the portrait plate. */
+export const TALL_ASPECT_BELOW = 4 / 5;
+
+/** Media queries that split screens exactly as `posterPlate` does. */
+export const TALL_MEDIA = "(aspect-ratio < 4/5)";
+export const WIDE_MEDIA = "(aspect-ratio >= 4/5)";
+
+export type PosterPlate = "gate" | "gate-tall";
+
+export const posterPlates: Readonly<Record<PosterPlate, { size: Readonly<Size>; anchor: Readonly<Anchor> }>> = {
+  gate: { size: PLATE, anchor: GATE_ANCHOR },
+  "gate-tall": { size: PLATE_TALL, anchor: GATE_TALL_ANCHOR },
+};
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
@@ -80,6 +106,44 @@ export function plateToViewport(box: PlateBox, point: PlatePoint): ViewportPoint
 
 export function viewportToPlate(box: PlateBox, point: ViewportPoint): PlatePoint {
   return { u: (point.x - box.x) / box.width, v: (point.y - box.y) / box.height };
+}
+
+/** Which gate plate the poster shows on this viewport. */
+export function posterPlate(viewport: Size): PosterPlate {
+  assertSize(viewport, "viewport");
+  return viewport.width / viewport.height < TALL_ASPECT_BELOW ? "gate-tall" : "gate";
+}
+
+/** A point on gate.jpg expressed on gate-tall.jpg. */
+export function gateToTall(point: PlatePoint): PlatePoint {
+  return {
+    u: (point.u * PLATE.width + TALL_OFFSET.x) / PLATE_TALL.width,
+    v: (point.v * PLATE.height + TALL_OFFSET.y) / PLATE_TALL.height,
+  };
+}
+
+/** A point on gate-tall.jpg expressed on gate.jpg. */
+export function tallToGate(point: PlatePoint): PlatePoint {
+  return {
+    u: (point.u * PLATE_TALL.width - TALL_OFFSET.x) / PLATE.width,
+    v: (point.v * PLATE_TALL.height - TALL_OFFSET.y) / PLATE.height,
+  };
+}
+
+/** Box of the gate poster on this viewport, whichever plate it shows. */
+export function posterBox(viewport: Size): { plate: PosterPlate; box: PlateBox } {
+  const plate = posterPlate(viewport);
+  const { size, anchor } = posterPlates[plate];
+  return { plate, box: plateBox(viewport, size, anchor) };
+}
+
+/**
+ * Where a point given in gate.jpg coordinates lands on screen. Gate layers are
+ * authored on gate.jpg, so they line up with either poster plate through this.
+ */
+export function gateToViewport(viewport: Size, point: PlatePoint): ViewportPoint {
+  const { plate, box } = posterBox(viewport);
+  return plateToViewport(box, plate === "gate-tall" ? gateToTall(point) : point);
 }
 
 /** CSS `object-position` that reproduces `plateBox` for the same anchor. */

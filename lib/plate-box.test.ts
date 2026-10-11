@@ -3,10 +3,16 @@ import {
   CENTER,
   GATE_ANCHOR,
   PLATE,
+  PLATE_TALL,
   coverSizes,
+  gateToTall,
+  gateToViewport,
   objectPosition,
   plateBox,
   plateToViewport,
+  posterBox,
+  posterPlate,
+  tallToGate,
   viewportToPlate,
 } from "./plate-box";
 
@@ -94,5 +100,70 @@ describe("CSS helpers", () => {
 
   it("describes the rendered width for responsive image selection", () => {
     expect(coverSizes()).toBe("(max-aspect-ratio: 2576/1438) 179.14vh, 100vw");
+  });
+});
+
+describe("portrait gate plate", () => {
+  const px = (x: number, y: number) => ({ u: x / PLATE.width, v: y / PLATE.height });
+  const toTallPx = (x: number, y: number) => {
+    const p = gateToTall(px(x, y));
+    return { x: p.u * PLATE_TALL.width, y: p.v * PLATE_TALL.height };
+  };
+
+  it("shifts gate.jpg pixels by the measured offset", () => {
+    for (const [x, y] of [
+      [10, 0],
+      [1288, 719],
+      [2561, 1437],
+    ] as const) {
+      const tall = toTallPx(x, y);
+      expect(tall.x).toBeCloseTo(x - 10, 9);
+      expect(tall.y).toBeCloseTo(y + 1671, 9);
+    }
+  });
+
+  it("round-trips between the two plates", () => {
+    for (const point of [px(271, 900), px(2354, 1369), { u: 0.5, v: 0.5 }]) {
+      const back = tallToGate(gateToTall(point));
+      expect(back.u).toBeCloseTo(point.u, 12);
+      expect(back.v).toBeCloseTo(point.v, 12);
+    }
+  });
+
+  it.each([
+    [{ width: 390, height: 844 }, "gate-tall"],
+    [{ width: 799, height: 1000 }, "gate-tall"],
+    [{ width: 800, height: 1000 }, "gate"],
+    [{ width: 1024, height: 1366 }, "gate-tall"],
+    [{ width: 1536, height: 864 }, "gate"],
+    [{ width: 1920, height: 1080 }, "gate"],
+  ] as const)("picks the plate for %o", (viewport, expected) => {
+    expect(posterPlate(viewport)).toBe(expected);
+  });
+
+  it("places a gate point on the same spot through either plate", () => {
+    const viewport = { width: 390, height: 844 };
+    const { box } = posterBox(viewport);
+    const latch = px(1288, 1100);
+    const viaTall = plateToViewport(box, gateToTall(latch));
+    expect(gateToViewport(viewport, latch)).toEqual(viaTall);
+
+    const wide = { width: 1536, height: 864 };
+    expect(gateToViewport(wide, latch)).toEqual(plateToViewport(plateBox(wide, PLATE, GATE_ANCHOR), latch));
+  });
+
+  it("keeps both gate posts in frame on a 390×844 phone", () => {
+    const viewport = { width: 390, height: 844 };
+    const leftPost = gateToViewport(viewport, px(271, 900));
+    const rightPost = gateToViewport(viewport, px(2355, 900));
+    expect(leftPost.x).toBeGreaterThanOrEqual(0);
+    expect(rightPost.x).toBeLessThanOrEqual(viewport.width);
+  });
+
+  it("covers portrait screens without stretching", () => {
+    const { box } = posterBox({ width: 390, height: 844 });
+    expect(box.width / box.height).toBeCloseTo(PLATE_TALL.width / PLATE_TALL.height, 10);
+    expect(box.height).toBeCloseTo(844, 10);
+    expect(coverSizes(PLATE_TALL)).toBe("(max-aspect-ratio: 2552/4577) 55.76vh, 100vw");
   });
 });
