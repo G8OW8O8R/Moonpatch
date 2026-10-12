@@ -18,6 +18,7 @@ scope.onmessage = (event: MessageEvent<ToWorker>) => {
         onFail: (reason) => post({ type: "fail", reason }),
         onStats: (stats) => post({ type: "stats", stats }),
         onRideSettled: (ride) => post({ type: "settled", ride }),
+        onSquareReady: () => post({ type: "squareReady" }),
       });
       break;
     case "progress":
@@ -28,6 +29,13 @@ scope.onmessage = (event: MessageEvent<ToWorker>) => {
       break;
     case "params":
       engine?.setParams(message.params);
+      break;
+    case "square":
+      engine?.setSquare(message.state);
+      break;
+    case "label":
+      if (engine) engine.setLabel(message.arm, message.bitmap);
+      else message.bitmap.close();
       break;
     case "resize":
       engine?.resize(message.css, message.dpr);

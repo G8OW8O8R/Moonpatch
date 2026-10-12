@@ -1,11 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { defaultLocale, localeFromAcceptLanguage, splitLocale } from "@/lib/i18n";
+import { routeFor } from "@/lib/routes";
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (splitLocale(pathname).locale) return NextResponse.next();
-
   const url = request.nextUrl.clone();
+
+  if (splitLocale(pathname).locale) {
+    // Polish addresses are Polish words; the pages behind them keep one name.
+    const route = routeFor(pathname);
+    if (!route) return NextResponse.next();
+    if ("rewrite" in route) {
+      url.pathname = route.rewrite;
+      return NextResponse.rewrite(url);
+    }
+    url.pathname = route.redirect;
+    return NextResponse.redirect(url, 308);
+  }
 
   // The front door greets visitors in their own language.
   if (pathname === "/") {

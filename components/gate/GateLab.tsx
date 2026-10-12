@@ -2,7 +2,8 @@
 
 import { type ReactNode, useCallback, useState } from "react";
 import { type RigParams, defaultRig } from "@/lib/gate-rig";
-import { type GateDebugState, GateScene } from "./GateScene";
+import { type Track, defaultTrack } from "@/lib/square-rig";
+import { type GateDebugState, GateScene, type SquareCopy } from "./GateScene";
 
 interface Control {
   key: keyof RigParams;
@@ -34,22 +35,23 @@ const controls: Control[] = [
 const format = (n: number) => (Math.abs(n) >= 10 ? n.toFixed(0) : n.toFixed(2));
 
 /** Development rig for the gate: every tunable of the scene on sliders, plus a frame counter. */
-export function GateLab({ children }: { children: ReactNode }) {
+export function GateLab({ children, square }: { children: ReactNode; square: SquareCopy }) {
   const [params, setParams] = useState<RigParams>(defaultRig);
-  const [length, setLength] = useState(2.5);
+  const [track, setTrack] = useState<Track>(defaultTrack);
   const [state, setState] = useState<GateDebugState | null>(null);
   const onDebug = useCallback((next: GateDebugState) => setState(next), []);
 
+  // Progress here is the gate's own: 0–1 over its share of the scroll.
   const scrollTo = (p: number) => {
     const section = document.querySelector("main section");
     if (!section) return;
     const top = section.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top: top + p * (section.clientHeight - window.innerHeight), behavior: "instant" });
+    window.scrollTo({ top: top + p * track.gate * window.innerHeight, behavior: "instant" });
   };
 
   return (
     <>
-      <GateScene labelledBy="gate-heading" params={params} length={length} onDebug={onDebug}>
+      <GateScene labelledBy="gate-heading" square={square} params={params} track={track} onDebug={onDebug}>
         {children}
       </GateScene>
       <aside className="fixed right-4 bottom-4 z-40 max-h-[80svh] w-72 overflow-y-auto rounded-md bg-paper/95 p-4 text-[13px] leading-tight text-ink shadow-lg">
@@ -71,21 +73,27 @@ export function GateLab({ children }: { children: ReactNode }) {
             className="w-full accent-pumpkin"
           />
         </label>
-        <label className="mb-2 block">
-          <span className="flex justify-between">
-            <span>Section (× viewport)</span>
-            <span className="tabular-nums">{format(length)}</span>
-          </span>
-          <input
-            type="range"
-            min={1.5}
-            max={5}
-            step={0.1}
-            value={length}
-            onChange={(e) => setLength(Number(e.target.value))}
-            className="w-full accent-pumpkin"
-          />
-        </label>
+        {([
+          ["gate", "Gate scroll (× viewport)", 0.8, 3],
+          ["dusk", "Dusk scroll (× viewport)", 0.5, 3],
+          ["wander", "Push-in scroll (× viewport)", 0.2, 1.5],
+        ] as const).map(([key, label, min, max]) => (
+          <label key={key} className="mb-2 block">
+            <span className="flex justify-between">
+              <span>{label}</span>
+              <span className="tabular-nums">{format(track[key])}</span>
+            </span>
+            <input
+              type="range"
+              min={min}
+              max={max}
+              step={0.1}
+              value={track[key]}
+              onChange={(e) => setTrack((t) => ({ ...t, [key]: Number(e.target.value) }))}
+              className="w-full accent-pumpkin"
+            />
+          </label>
+        ))}
         {controls.map(({ key, label, min, max, step }) => (
           <label key={key} className="mb-2 block">
             <span className="flex justify-between">

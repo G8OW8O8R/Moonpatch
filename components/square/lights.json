@@ -1,0 +1,744 @@
+{
+  "size": {
+    "width": 2576,
+    "height": 1438
+  },
+  "lights": [
+    {
+      "id": 1,
+      "name": "bulb-1",
+      "kind": "bulb",
+      "x": 540,
+      "y": 600,
+      "order": 0.358
+    },
+    {
+      "id": 2,
+      "name": "bulb-2",
+      "kind": "bulb",
+      "x": 902,
+      "y": 592,
+      "order": 0.226
+    },
+    {
+      "id": 3,
+      "name": "bulb-3",
+      "kind": "bulb",
+      "x": 1655,
+      "y": 604,
+      "order": 0.186
+    },
+    {
+      "id": 4,
+      "name": "bulb-4",
+      "kind": "bulb",
+      "x": 1620,
+      "y": 609,
+      "order": 0.228
+    },
+    {
+      "id": 5,
+      "name": "bulb-5",
+      "kind": "bulb",
+      "x": 916,
+      "y": 600,
+      "order": 0.246
+    },
+    {
+      "id": 6,
+      "name": "bulb-6",
+      "kind": "bulb",
+      "x": 385,
+      "y": 634,
+      "order": 0.544
+    },
+    {
+      "id": 7,
+      "name": "bulb-7",
+      "kind": "bulb",
+      "x": 699,
+      "y": 689,
+      "order": 0.649
+    },
+    {
+      "id": 8,
+      "name": "bulb-8",
+      "kind": "bulb",
+      "x": 1591,
+      "y": 592,
+      "order": 0.283
+    },
+    {
+      "id": 9,
+      "name": "bulb-9",
+      "kind": "bulb",
+      "x": 1595,
+      "y": 518,
+      "order": 0.198
+    },
+    {
+      "id": 10,
+      "name": "bulb-10",
+      "kind": "bulb",
+      "x": 1726,
+      "y": 532,
+      "order": 0.071
+    },
+    {
+      "id": 11,
+      "name": "bulb-11",
+      "kind": "bulb",
+      "x": 816,
+      "y": 454,
+      "order": 0.007
+    },
+    {
+      "id": 12,
+      "name": "bulb-12",
+      "kind": "bulb",
+      "x": 1706,
+      "y": 563,
+      "order": 0.109
+    },
+    {
+      "id": 13,
+      "name": "bulb-13",
+      "kind": "bulb",
+      "x": 1608,
+      "y": 605,
+      "order": 0.271
+    },
+    {
+      "id": 14,
+      "name": "bulb-14",
+      "kind": "bulb",
+      "x": 436,
+      "y": 630,
+      "order": 0.489
+    },
+    {
+      "id": 15,
+      "name": "bulb-15",
+      "kind": "bulb",
+      "x": 1364,
+      "y": 554,
+      "order": 0.5
+    },
+    {
+      "id": 16,
+      "name": "bulb-16",
+      "kind": "bulb",
+      "x": 1645,
+      "y": 607,
+      "order": 0.23
+    },
+    {
+      "id": 17,
+      "name": "bulb-17",
+      "kind": "bulb",
+      "x": 1599,
+      "y": 599,
+      "order": 0.277
+    },
+    {
+      "id": 18,
+      "name": "bulb-18",
+      "kind": "bulb",
+      "x": 1744,
+      "y": 498,
+      "order": 0.028
+    },
+    {
+      "id": 19,
+      "name": "bulb-19",
+      "kind": "bulb",
+      "x": 605,
+      "y": 567,
+      "order": 0.289
+    },
+    {
+      "id": 20,
+      "name": "bulb-20",
+      "kind": "bulb",
+      "x": 1674,
+      "y": 496,
+      "order": 0.111
+    },
+    {
+      "id": 21,
+      "name": "bulb-21",
+      "kind": "bulb",
+      "x": 486,
+      "y": 617,
+      "order": 0.423
+    },
+    {
+      "id": 22,
+      "name": "bulb-22",
+      "kind": "bulb",
+      "x": 1522,
+      "y": 532,
+      "order": 0.287
+    },
+    {
+      "id": 23,
+      "name": "bulb-23",
+      "kind": "bulb",
+      "x": 1441,
+      "y": 545,
+      "order": 0.395
+    },
+    {
+      "id": 24,
+      "name": "bulb-24",
+      "kind": "bulb",
+      "x": 336,
+      "y": 631,
+      "order": 0.607
+    },
+    {
+      "id": 25,
+      "name": "bulb-25",
+      "kind": "bulb",
+      "x": 1106,
+      "y": 630,
+      "order": 0.473
+    },
+    {
+      "id": 26,
+      "name": "bulb-26",
+      "kind": "bulb",
+      "x": 1442,
+      "y": 554,
+      "order": 0.409
+    },
+    {
+      "id": 27,
+      "name": "bulb-27",
+      "kind": "bulb",
+      "x": 886,
+      "y": 580,
+      "order": 0.202
+    },
+    {
+      "id": 28,
+      "name": "bulb-28",
+      "kind": "bulb",
+      "x": 1539,
+      "y": 605,
+      "order": 0.352
+    },
+    {
+      "id": 29,
+      "name": "bulb-29",
+      "kind": "bulb",
+      "x": 1671,
+      "y": 590,
+      "order": 0.186
+    },
+    {
+      "id": 30,
+      "name": "bulb-30",
+      "kind": "bulb",
+      "x": 952,
+      "y": 604,
+      "order": 0.283
+    },
+    {
+      "id": 31,
+      "name": "bulb-31",
+      "kind": "bulb",
+      "x": 1285,
+      "y": 560,
+      "order": 0.589
+    },
+    {
+      "id": 32,
+      "name": "bulb-32",
+      "kind": "bulb",
+      "x": 1522,
+      "y": 542,
+      "order": 0.286
+    },
+    {
+      "id": 33,
+      "name": "bulb-33",
+      "kind": "bulb",
+      "x": 745,
+      "y": 690,
+      "order": 0.63
+    },
+    {
+      "id": 34,
+      "name": "bulb-34",
+      "kind": "bulb",
+      "x": 1684,
+      "y": 580,
+      "order": 0.157
+    },
+    {
+      "id": 35,
+      "name": "bulb-35",
+      "kind": "bulb",
+      "x": 1350,
+      "y": 651,
+      "order": 0.588
+    },
+    {
+      "id": 36,
+      "name": "bulb-36",
+      "kind": "bulb",
+      "x": 966,
+      "y": 510,
+      "order": 0.221
+    },
+    {
+      "id": 37,
+      "name": "bulb-37",
+      "kind": "bulb",
+      "x": 871,
+      "y": 564,
+      "order": 0.159
+    },
+    {
+      "id": 38,
+      "name": "bulb-38",
+      "kind": "bulb",
+      "x": 839,
+      "y": 669,
+      "order": 0.314
+    },
+    {
+      "id": 39,
+      "name": "bulb-39",
+      "kind": "bulb",
+      "x": 1156,
+      "y": 645,
+      "order": 0.534
+    },
+    {
+      "id": 40,
+      "name": "bulb-40",
+      "kind": "bulb",
+      "x": 723,
+      "y": 497,
+      "order": 0.117
+    },
+    {
+      "id": 41,
+      "name": "bulb-41",
+      "kind": "bulb",
+      "x": 1252,
+      "y": 653,
+      "order": 0.651
+    },
+    {
+      "id": 42,
+      "name": "bulb-42",
+      "kind": "bulb",
+      "x": 1493,
+      "y": 623,
+      "order": 0.391
+    },
+    {
+      "id": 43,
+      "name": "bulb-43",
+      "kind": "bulb",
+      "x": 1203,
+      "y": 648,
+      "order": 0.609
+    },
+    {
+      "id": 44,
+      "name": "bulb-44",
+      "kind": "bulb",
+      "x": 889,
+      "y": 484,
+      "order": 0.136
+    },
+    {
+      "id": 45,
+      "name": "bulb-45",
+      "kind": "bulb",
+      "x": 941,
+      "y": 605,
+      "order": 0.249
+    },
+    {
+      "id": 46,
+      "name": "bulb-46",
+      "kind": "bulb",
+      "x": 929,
+      "y": 604,
+      "order": 0.261
+    },
+    {
+      "id": 47,
+      "name": "bulb-47",
+      "kind": "bulb",
+      "x": 1122,
+      "y": 544,
+      "order": 0.43
+    },
+    {
+      "id": 48,
+      "name": "bulb-48",
+      "kind": "bulb",
+      "x": 815,
+      "y": 480,
+      "order": 0.03
+    },
+    {
+      "id": 49,
+      "name": "bulb-49",
+      "kind": "bulb",
+      "x": 925,
+      "y": 626,
+      "order": 0.273
+    },
+    {
+      "id": 50,
+      "name": "bulb-50",
+      "kind": "bulb",
+      "x": 1744,
+      "y": 468,
+      "order": 0.008
+    },
+    {
+      "id": 51,
+      "name": "bulb-51",
+      "kind": "bulb",
+      "x": 1447,
+      "y": 638,
+      "order": 0.466
+    },
+    {
+      "id": 52,
+      "name": "bulb-52",
+      "kind": "bulb",
+      "x": 833,
+      "y": 513,
+      "order": 0.079
+    },
+    {
+      "id": 53,
+      "name": "bulb-53",
+      "kind": "bulb",
+      "x": 1662,
+      "y": 587,
+      "order": 0.166
+    },
+    {
+      "id": 54,
+      "name": "bulb-54",
+      "kind": "bulb",
+      "x": 1043,
+      "y": 529,
+      "order": 0.331
+    },
+    {
+      "id": 55,
+      "name": "bulb-55",
+      "kind": "bulb",
+      "x": 796,
+      "y": 458,
+      "order": 0
+    },
+    {
+      "id": 56,
+      "name": "bulb-56",
+      "kind": "bulb",
+      "x": 663,
+      "y": 669,
+      "order": 0.602
+    },
+    {
+      "id": 57,
+      "name": "bulb-57",
+      "kind": "bulb",
+      "x": 306,
+      "y": 638,
+      "order": 0.649
+    },
+    {
+      "id": 58,
+      "name": "bulb-58",
+      "kind": "bulb",
+      "x": 1202,
+      "y": 555,
+      "order": 0.513
+    },
+    {
+      "id": 59,
+      "name": "bulb-59",
+      "kind": "bulb",
+      "x": 816,
+      "y": 464,
+      "order": 0.015
+    },
+    {
+      "id": 60,
+      "name": "bulb-60",
+      "kind": "bulb",
+      "x": 972,
+      "y": 591,
+      "order": 0.29
+    },
+    {
+      "id": 61,
+      "name": "bulb-61",
+      "kind": "bulb",
+      "x": 1694,
+      "y": 557,
+      "order": 0.122
+    },
+    {
+      "id": 62,
+      "name": "bulb-62",
+      "kind": "bulb",
+      "x": 961,
+      "y": 605,
+      "order": 0.276
+    },
+    {
+      "id": 63,
+      "name": "bulb-63",
+      "kind": "bulb",
+      "x": 1058,
+      "y": 610,
+      "order": 0.39
+    },
+    {
+      "id": 64,
+      "name": "bulb-64",
+      "kind": "bulb",
+      "x": 983,
+      "y": 582,
+      "order": 0.306
+    },
+    {
+      "id": 65,
+      "name": "bulb-65",
+      "kind": "bulb",
+      "x": 881,
+      "y": 649,
+      "order": 0.255
+    },
+    {
+      "id": 66,
+      "name": "bulb-66",
+      "kind": "bulb",
+      "x": 1673,
+      "y": 578,
+      "order": 0.155
+    },
+    {
+      "id": 67,
+      "name": "bulb-67",
+      "kind": "bulb",
+      "x": 684,
+      "y": 685,
+      "order": 0.624
+    },
+    {
+      "id": 68,
+      "name": "bulb-68",
+      "kind": "bulb",
+      "x": 666,
+      "y": 535,
+      "order": 0.205
+    },
+    {
+      "id": 69,
+      "name": "bulb-69",
+      "kind": "bulb",
+      "x": 1576,
+      "y": 584,
+      "order": 0.262
+    },
+    {
+      "id": 70,
+      "name": "bulb-70",
+      "kind": "bulb",
+      "x": 1397,
+      "y": 650,
+      "order": 0.503
+    },
+    {
+      "id": 71,
+      "name": "bulb-71",
+      "kind": "bulb",
+      "x": 1724,
+      "y": 516,
+      "order": 0.068
+    },
+    {
+      "id": 72,
+      "name": "bulb-72",
+      "kind": "bulb",
+      "x": 684,
+      "y": 676,
+      "order": 0.61
+    },
+    {
+      "id": 73,
+      "name": "bulb-73",
+      "kind": "bulb",
+      "x": 1011,
+      "y": 589,
+      "order": 0.328
+    },
+    {
+      "id": 74,
+      "name": "bulb-74",
+      "kind": "bulb",
+      "x": 1683,
+      "y": 500,
+      "order": 0.078
+    },
+    {
+      "id": 75,
+      "name": "bulb-75",
+      "kind": "bulb",
+      "x": 644,
+      "y": 701,
+      "order": 0.635
+    },
+    {
+      "id": 76,
+      "name": "barn-transom",
+      "kind": "window",
+      "x": 516,
+      "y": 666,
+      "order": 0.5
+    },
+    {
+      "id": 77,
+      "name": "barn-door",
+      "kind": "window",
+      "x": 523,
+      "y": 813,
+      "order": 0.56
+    },
+    {
+      "id": 78,
+      "name": "cafe-porch",
+      "kind": "lamp",
+      "x": 1333,
+      "y": 767,
+      "order": 0.6
+    },
+    {
+      "id": 79,
+      "name": "cafe-door",
+      "kind": "window",
+      "x": 1290,
+      "y": 781,
+      "order": 0.66
+    },
+    {
+      "id": 80,
+      "name": "cafe-left",
+      "kind": "window",
+      "x": 1190,
+      "y": 796,
+      "order": 0.7
+    },
+    {
+      "id": 81,
+      "name": "cafe-right",
+      "kind": "window",
+      "x": 1382,
+      "y": 791,
+      "order": 0.73
+    },
+    {
+      "id": 82,
+      "name": "cafe-gable",
+      "kind": "window",
+      "x": 1291,
+      "y": 654,
+      "order": 0.8
+    },
+    {
+      "id": 83,
+      "name": "cafe-wing",
+      "kind": "window",
+      "x": 1544,
+      "y": 797,
+      "order": 0.84
+    },
+    {
+      "id": 84,
+      "name": "shop-lantern",
+      "kind": "lamp",
+      "x": 2101,
+      "y": 745,
+      "order": 0.62
+    },
+    {
+      "id": 85,
+      "name": "shop-door",
+      "kind": "window",
+      "x": 2098,
+      "y": 807,
+      "order": 0.78
+    },
+    {
+      "id": 86,
+      "name": "shop-left",
+      "kind": "window",
+      "x": 2014,
+      "y": 773,
+      "order": 0.82
+    },
+    {
+      "id": 87,
+      "name": "shop-right",
+      "kind": "window",
+      "x": 2180,
+      "y": 773,
+      "order": 0.86
+    },
+    {
+      "id": 88,
+      "name": "shop-upper",
+      "kind": "window",
+      "x": 2074,
+      "y": 527,
+      "order": 0.9
+    },
+    {
+      "id": 89,
+      "name": "jack-1",
+      "kind": "lamp",
+      "x": 1972,
+      "y": 958,
+      "order": 0.92
+    },
+    {
+      "id": 90,
+      "name": "jack-2",
+      "kind": "lamp",
+      "x": 2024,
+      "y": 943,
+      "order": 0.94
+    },
+    {
+      "id": 91,
+      "name": "jack-3",
+      "kind": "lamp",
+      "x": 2121,
+      "y": 958,
+      "order": 0.96
+    },
+    {
+      "id": 92,
+      "name": "jack-4",
+      "kind": "lamp",
+      "x": 2151,
+      "y": 1011,
+      "order": 0.98
+    }
+  ]
+}

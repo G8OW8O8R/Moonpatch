@@ -13,6 +13,7 @@
  */
 import { type CubicBezier, ease, spring } from "./motion-tokens";
 import { PLATE, SQUARE_ANCHOR, type Size, TALL_OFFSET, posterBox, squareBox } from "./plate-box";
+import { followLimited } from "./spring";
 
 export interface Vec2 {
   x: number;
@@ -206,23 +207,7 @@ export interface Follower {
  * It never passes its target, in either direction.
  */
 export function followOpening(current: Follower, target: number, dt: number, params: RigParams = defaultRig): Follower {
-  const omega = 14;
-  const limit = params.followSpeed / params.openEnd;
-  let { value, velocity } = current;
-  const steps = Math.max(1, Math.ceil(dt / (1 / 240)));
-  const h = dt / steps;
-  for (let i = 0; i < steps; i++) {
-    const before = target - value;
-    velocity += (omega * omega * before - 2 * omega * velocity) * h;
-    velocity = Math.max(-limit, Math.min(limit, velocity));
-    value += velocity * h;
-    if (before === 0 || Math.sign(target - value) !== Math.sign(before)) {
-      value = target;
-      velocity = 0;
-    }
-  }
-  if (Math.abs(target - value) < 1e-4 && Math.abs(velocity) < 1e-3) return { value: target, velocity: 0 };
-  return { value, velocity };
+  return followLimited(current, target, dt, params.followSpeed / params.openEnd);
 }
 
 /** Camera depth along the ride, in gate distances. */

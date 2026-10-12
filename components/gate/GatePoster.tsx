@@ -23,13 +23,18 @@ const tall = variants("gate-tall");
  * The gate at golden hour: the first frame of the page. Landscape and squarish
  * screens get gate.jpg, portrait phones the tall plate of the same scene. Both
  * are cover-fitted with the shared plate geometry; the variants are
- * pre-encoded by `pnpm images`, so this is a plain <picture>.
+ * pre-encoded by `pnpm images`, so this is a plain <picture>. Where the page
+ * opens elsewhere (on the notice board), it is not the first thing seen and
+ * gives up its priority.
  */
-export function GatePoster({ alt }: { alt: string }) {
-  for (const [variant, media] of [
-    [wide, WIDE_MEDIA],
-    [tall, TALL_MEDIA],
-  ] as const) {
+export function GatePoster({ alt, priority = true }: { alt: string; priority?: boolean }) {
+  const preloads = priority
+    ? ([
+        [wide, WIDE_MEDIA],
+        [tall, TALL_MEDIA],
+      ] as const)
+    : [];
+  for (const [variant, media] of preloads) {
     preload(`${variant.base}-1600.avif`, {
       as: "image",
       type: "image/avif",
@@ -53,8 +58,8 @@ export function GatePoster({ alt }: { alt: string }) {
           alt={alt}
           width={PLATE.width}
           height={PLATE.height}
-          fetchPriority="high"
-          decoding="sync"
+          fetchPriority={priority ? "high" : "auto"}
+          decoding={priority ? "sync" : "async"}
           draggable={false}
           className="gate-poster absolute inset-0 size-full object-cover select-none"
         />

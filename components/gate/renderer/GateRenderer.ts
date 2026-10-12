@@ -217,6 +217,20 @@ export class GateRenderer {
     return this.stats;
   }
 
+  /** square-golden on the GPU: the square scene draws from this very texture. */
+  get squareTexture(): WebGLTexture {
+    return this.square;
+  }
+
+  /** Device pixels per CSS pixel actually drawn (capped, and lower once quality drops). */
+  get devicePixelRatio(): number {
+    return this.dpr;
+  }
+
+  get size(): { width: number; height: number } {
+    return { width: this.canvas.width, height: this.canvas.height };
+  }
+
   /** Draws one frame of the scene; `riding` while the timed ride is under way. */
   render(state: SceneState, params: RigParams, riding: boolean) {
     const { gl } = this;

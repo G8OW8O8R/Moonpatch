@@ -4,14 +4,18 @@
  * the page. Loaded lazily, after the poster has painted.
  */
 import type { RigParams } from "@/lib/gate-rig";
+import type { ArmId } from "@/lib/square-props";
 import { type Size, posterPlate } from "@/lib/plate-box";
 import type { FrameStats } from "./GateRenderer";
+import type { SquareState } from "./SquareRenderer";
 import { type Engine, type EngineEvents, type EngineSetup, type FromWorker, type ToWorker, runGate } from "./engine";
 
 export interface GateController {
   setProgress(progress: number): void;
   setRide(target: 0 | 1): void;
   setParams(params: RigParams): void;
+  setSquare(state: SquareState): void;
+  setLabel(arm: ArmId, bitmap: ImageBitmap): void;
   resize(css: Size): void;
   setActive(active: boolean): void;
   dispose(): void;
@@ -27,6 +31,8 @@ export interface GateCallbacks {
   onStats?(stats: FrameStats): void;
   /** The timed ride has arrived: the page may scroll again. */
   onRideSettled?(ride: 0 | 1): void;
+  /** The square's dusk layers and props are ready to draw. */
+  onSquareReady?(): void;
 }
 
 /** The engine behind a worker, driven by messages. */
@@ -38,6 +44,7 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
     if (message.type === "ready") callbacks.onReady();
     else if (message.type === "fail") callbacks.onFail(message.reason);
     else if (message.type === "settled") callbacks.onRideSettled(message.ride);
+    else if (message.type === "squareReady") callbacks.onSquareReady();
     else callbacks.onStats(message.stats);
   };
   worker.onerror = () => callbacks.onFail("worker failed");
@@ -47,6 +54,8 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
     setProgress: (progress) => send({ type: "progress", progress }),
     setRide: (target) => send({ type: "ride", target }),
     setParams: (params) => send({ type: "params", params }),
+    setSquare: (state) => send({ type: "square", state }),
+    setLabel: (arm, bitmap) => send({ type: "label", arm, bitmap }, [bitmap]),
     resize: (css, dpr) => send({ type: "resize", css, dpr }),
     setActive: (active) => send({ type: "active", active }),
     dispose: () => {
@@ -60,13 +69,14 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
 export function startGate(
   canvas: HTMLCanvasElement,
   poster: HTMLImageElement,
-  initial: { css: Size; params: RigParams; progress: number },
+  initial: { css: Size; params: RigParams; progress: number; square: SquareState; debugLayer?: "gate" | "plate" },
   callbacks: GateCallbacks,
 ): GateController {
   let css = initial.css;
   let engine: Engine | null = null;
   let disposed = false;
   let pending: Array<(e: Engine) => void> = [];
+  let latestSquare = initial.square;
   const plate = /gate-tall/.test(poster.currentSrc) ? "gate-tall" : posterPlate(css);
   const dpr = () => window.devicePixelRatio || 1;
   const withEngine = (task: (e: Engine) => void) => (engine ? task(engine) : pending.push(task));
@@ -83,6 +93,9 @@ export function startGate(
     },
     onStats: (stats: FrameStats) => callbacks.onStats?.(stats),
     onRideSettled: (ride) => callbacks.onRideSettled?.(ride),
+    onSquareReady: () => {
+      if (!disposed) callbacks.onSquareReady?.();
+    },
   };
 
   // The poster's file and natural size are only final once it has decoded.
@@ -98,6 +111,8 @@ export function startGate(
         dpr: dpr(),
         params: initial.params,
         progress: initial.progress,
+        square: latestSquare,
+        ...(initial.debugLayer ? { debugLayer: initial.debugLayer } : {}),
       };
       const offscreen = "transferControlToOffscreen" in canvas && typeof Worker !== "undefined";
       engine = offscreen ? workerEngine(canvas, setup, events) : runGate(canvas, setup, events);
@@ -109,6 +124,11 @@ export function startGate(
     setProgress: (progress) => withEngine((e) => e.setProgress(progress)),
     setRide: (target) => withEngine((e) => e.setRide(target)),
     setParams: (params) => withEngine((e) => e.setParams(params)),
+    setSquare(state) {
+      latestSquare = state;
+      if (engine) engine.setSquare(state);
+    },
+    setLabel: (arm, bitmap) => withEngine((e) => e.setLabel(arm, bitmap)),
     resize(next) {
       css = next;
       if (posterPlate(next) !== plate) {

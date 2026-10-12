@@ -16,5 +16,45 @@
     "soundOff": "Sound is off",
     "moons": "{found} of {total} moons found",
     "basket": "{count} in your wheelbarrow"
+  },
+  "square": {
+    "heading": "The square",
+    "intro": "A red barn, a cream café and a dark gray haunt shop stand around a square full of pumpkins. Keep scrolling and dusk falls: the string lights come on one by one.",
+    "tagline": "Pick a door. Stay a while.",
+    "wander": "Scroll to wander",
+    "pickDoor": "Pick a door",
+    "signpost": "Signpost",
+    "arms": {
+      "cafe": "Café",
+      "barn": "Barn",
+      "haunt": "Haunt Shop"
+    },
+    "board": "Notice board: hours, what's on and how to find us"
+  },
+  "visit": {
+    "title": "Visit us",
+    "description": "Hours, what's on and a hand-drawn map to Moonpatch Farm, pinned to the notice board on the square.",
+    "board": "Notice board",
+    "close": "Back to the square",
+    "map": "Hand-drawn map: Hollow Road winds from the gate past the orchard to the farm.",
+    "drawings": "Pencil sketches of three pumpkins and maple leaves."
+  },
+  "rooms": {
+    "back": "Back to the square",
+    "cafe": {
+      "title": "Café",
+      "description": "Cider donuts, pumpkin bread and something warm to hold, in the cream café with the sage door.",
+      "alt": "Inside the café: wooden floor, bentwood chairs around small tables, a sage counter with cakes and an espresso machine, string lights outside the tall windows."
+    },
+    "barn": {
+      "title": "Barn",
+      "description": "Wreaths, candles, jams and everything else that smells like October, in the red barn.",
+      "alt": "Inside the barn: hay bales up in the loft, wreaths on the plank wall, a long table of pumpkins, shelves of jars and baskets, string lights across the beams."
+    },
+    "haunt": {
+      "title": "Haunt Shop",
+      "description": "Masks, skulls and other things that go bump in the night. The one shop on the farm that bites.",
+      "alt": "Inside the haunt shop: dark walls, shelves of masks lit green and pink, a skeleton and a hooded reaper by the counter, jack-o'-lanterns and low purple light on the floor."
+    }
   }
 }

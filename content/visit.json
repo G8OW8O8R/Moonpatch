@@ -1,0 +1,31 @@
+{
+  "hours": {
+    "title": { "en": "Open every weekend in October", "pl": "Otwarte w każdy weekend października" },
+    "lines": [
+      { "en": "Fri–Sun · 10 am – 8 pm", "pl": "pt–nd · 10:00–20:00" },
+      { "en": "Halloween night · Oct 31 · until 11 pm", "pl": "Noc Halloween · 31 października · do 23:00" }
+    ]
+  },
+  "whatsOn": {
+    "title": { "en": "What's on", "pl": "Co się dzieje" },
+    "items": [
+      { "en": "Pick your own pumpkin", "pl": "Wybierz własną dynię" },
+      { "en": "Hayride at sunset", "pl": "Przejażdżka wozem z sianem o zachodzie" },
+      { "en": "Haunted barn tours", "pl": "Nawiedzona stodoła po zmroku" }
+    ]
+  },
+  "map": {
+    "gate": { "en": "The Gate", "pl": "Brama" },
+    "road": { "en": "Hollow Road, mile 3", "pl": "Hollow Road, 3. mila" },
+    "farm": { "en": "Moonpatch Farm", "pl": "Moonpatch Farm" }
+  },
+  "note": {
+    "text": {
+      "en": "Moonpatch Farm is a fictional farm, a concept site by GOVO DIGITAL.",
+      "pl": "Moonpatch Farm to fikcyjna farma, koncept strony od GOVO DIGITAL."
+    },
+    "link": { "en": "govodigital.com", "pl": "govodigital.com" },
+    "href": "https://www.govodigital.com"
+  },
+  "moon": { "id": "square", "hiddenBehind": "map" }
+}

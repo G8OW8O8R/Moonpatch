@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { GatePoster } from "@/components/gate/GatePoster";
-import { GateScene } from "@/components/gate/GateScene";
+import { FarmFront } from "@/components/gate/FarmFront";
 import { defaultLocale, isLocale, locales } from "@/lib/i18n";
-import { getMessages } from "@/lib/messages";
+import { placeAlternates, placePath } from "@/lib/routes";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]">): Promise<Metadata> {
   const { lang } = await params;
@@ -11,30 +10,15 @@ export async function generateMetadata({ params }: PageProps<"/[lang]">): Promis
 
   return {
     alternates: {
-      canonical: `/${lang}`,
-      languages: {
-        ...Object.fromEntries(locales.map((locale) => [locale, `/${locale}`])),
-        "x-default": `/${defaultLocale}`,
-      },
+      canonical: placePath(lang, "square"),
+      languages: placeAlternates("square", locales, defaultLocale),
     },
-    openGraph: { url: `/${lang}` },
+    openGraph: { url: placePath(lang, "square") },
   };
 }
 
 export default async function GatePage({ params }: PageProps<"/[lang]">) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const { gate } = getMessages(lang);
-
-  return (
-    <main>
-      <GateScene labelledBy="gate-heading">
-        <GatePoster alt={gate.posterAlt} />
-        <div className="sr-only">
-          <h1 id="gate-heading">{gate.heading}</h1>
-          <p>{gate.intro}</p>
-        </div>
-      </GateScene>
-    </main>
-  );
+  return <FarmFront lang={lang} />;
 }

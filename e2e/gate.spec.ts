@@ -25,7 +25,7 @@ test.describe("gate poster", () => {
       await page.setViewportSize(viewport);
       await page.goto("/en");
 
-      const poster = page.locator("main picture img");
+      const poster = page.locator("img.gate-poster");
       await expect(poster).toBeVisible();
       await expect
         .poll(() => poster.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth))

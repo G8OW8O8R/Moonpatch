@@ -16,5 +16,45 @@
     "soundOff": "Dźwięk wyłączony",
     "moons": "Znalezione księżyce: {found} z {total}",
     "basket": "W taczce: {count}"
+  },
+  "square": {
+    "heading": "Plac",
+    "intro": "Czerwona stodoła, kremowa kawiarnia i grafitowy sklep ze straszydłami stoją wokół placu pełnego dyń. Przewijaj dalej, a zapadnie zmierzch: girlandy zapalą się żarówka po żarówce.",
+    "tagline": "Wybierz drzwi. Zostań na dłużej.",
+    "wander": "Przewiń, żeby się rozejrzeć",
+    "pickDoor": "Wybierz drzwi",
+    "signpost": "Drogowskaz",
+    "arms": {
+      "cafe": "Kawiarnia",
+      "barn": "Stodoła",
+      "haunt": "Straszydła"
+    },
+    "board": "Tablica ogłoszeń: godziny, wydarzenia i dojazd"
+  },
+  "visit": {
+    "title": "Odwiedź nas",
+    "description": "Godziny, wydarzenia i odręczna mapka dojazdu do Moonpatch Farm, przypięte do tablicy ogłoszeń na placu.",
+    "board": "Tablica ogłoszeń",
+    "close": "Wróć na plac",
+    "map": "Odręczna mapka: Hollow Road wije się od bramy obok sadu aż do farmy.",
+    "drawings": "Szkice ołówkiem: trzy dynie i liście klonu."
+  },
+  "rooms": {
+    "back": "Wróć na plac",
+    "cafe": {
+      "title": "Kawiarnia",
+      "description": "Pączki z cydrem, chlebek dyniowy i coś ciepłego do rąk, w kremowej kawiarni z szałwiowymi drzwiami.",
+      "alt": "Wnętrze kawiarni: drewniana podłoga, gięte krzesła przy małych stolikach, szałwiowa lada z ciastami i ekspresem, girlandy za wysokimi oknami."
+    },
+    "barn": {
+      "title": "Stodoła",
+      "description": "Wieńce, świece, konfitury i wszystko, co pachnie październikiem, w czerwonej stodole.",
+      "alt": "Wnętrze stodoły: bele siana na strychu, wieńce na deskach, długi stół z dyniami, półki ze słoikami i koszami, girlandy pod belkami."
+    },
+    "haunt": {
+      "title": "Straszydła",
+      "description": "Maski, czaszki i inne rzeczy, które straszą po zmroku. Jedyny sklep na farmie, który gryzie.",
+      "alt": "Wnętrze sklepu ze straszydłami: ciemne ściany, półki z maskami w zielonym i różowym świetle, szkielet i zakapturzona postać przy ladzie, wydrążone dynie i niskie fioletowe światło przy podłodze."
+    }
   }
 }

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type Locale, localeNames, locales, switchLocalePath } from "@/lib/i18n";
+import { type Locale, localeNames, locales } from "@/lib/i18n";
+import { switchLanguage } from "@/lib/routes";
 
 export function LanguageSwitch({ current, label }: { current: Locale; label: string }) {
   const pathname = usePathname() ?? `/${current}`;
@@ -15,7 +16,7 @@ export function LanguageSwitch({ current, label }: { current: Locale; label: str
           <span key={locale} className="flex items-center gap-1.5">
             {index > 0 && <span aria-hidden="true">/</span>}
             <Link
-              href={switchLocalePath(pathname, locale)}
+              href={switchLanguage(pathname, locale)}
               hrefLang={locale}
               lang={locale}
               aria-current={active ? "page" : undefined}
