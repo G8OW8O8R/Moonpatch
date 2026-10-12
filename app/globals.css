@@ -154,3 +154,77 @@
     margin-top: max(0px, calc(var(--logo-height) * 0.27 - 1rem));
   }
 }
+
+/* With a mouse the system scrollbar would cut into the frame: it goes, scrolling
+   stays, and a crescent on a hairline shows the way down instead. Touch keeps
+   its own bar. */
+@media (hover: hover) and (pointer: fine) {
+  html {
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  .scroll-moon {
+    display: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .scroll-moon {
+      position: fixed;
+      z-index: 20;
+      top: 20vh;
+      right: 1rem;
+      display: block;
+      width: 10px;
+      height: 60vh;
+      pointer-events: none;
+      color: var(--header-ink);
+      opacity: 0;
+      transition:
+        opacity var(--duration-tap) var(--ease-out),
+        color var(--duration-scene-short) var(--ease-in-out);
+    }
+
+    .scroll-moon[data-shown] {
+      opacity: 1;
+    }
+  }
+
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+    .scroll-moon {
+      transition: none;
+    }
+  }
+
+  .scroll-moon-line {
+    position: absolute;
+    inset-block: 0;
+    left: calc(50% - 0.5px);
+    width: 1px;
+    background-color: currentColor;
+    opacity: 0.35;
+  }
+
+  /* As tall as the line, so a translate of 0–100% of its own height is the progress. */
+  .scroll-moon-rail {
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+  }
+
+  .scroll-moon-thumb {
+    position: absolute;
+    top: -5px;
+    left: 0;
+  }
+
+  .scroll-moon-thumb .mask-icon {
+    width: 10px;
+    height: 10px;
+  }
+}

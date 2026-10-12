@@ -3,6 +3,7 @@
 import "lenis/dist/lenis.css";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { type RigParams, defaultRig } from "@/lib/gate-rig";
+import { publishLenis } from "@/components/ui/lenis-channel";
 import { PLATE, SQUARE_ANCHOR, type Size, coverSizes, objectPosition, squareBox } from "@/lib/plate-box";
 import type { FrameStats } from "./renderer/GateRenderer";
 import type { GateController } from "./renderer/start";
@@ -153,7 +154,10 @@ export function GateScene({ children, labelledBy, length = 2.5, params = default
     let cancelled = false;
     if (!reduced) {
       void import("lenis").then(({ default: Lenis }) => {
-        if (!cancelled) lenis.current = new Lenis({ autoRaf: true, smoothWheel: true, syncTouch: false });
+        if (cancelled) return;
+        const instance = new Lenis({ autoRaf: true, smoothWheel: true, syncTouch: false });
+        lenis.current = instance;
+        publishLenis(instance);
       });
     }
     measure();
@@ -162,6 +166,7 @@ export function GateScene({ children, labelledBy, length = 2.5, params = default
     return () => {
       cancelled = true;
       window.clearTimeout(holdTimer.current);
+      if (lenis.current) publishLenis(null);
       lenis.current?.destroy();
       lenis.current = null;
       window.removeEventListener("scroll", measure);

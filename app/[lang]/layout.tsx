@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
+import { ScrollMoon } from "@/components/ui/ScrollMoon";
 import { SiteHeader } from "@/components/ui/SiteHeader";
 import { isLocale, locales } from "@/lib/i18n";
 import { getMessages } from "@/lib/messages";
@@ -51,6 +52,7 @@ export default async function LangLayout({ children, params }: LayoutProps<"/[la
       <body>
         <SiteHeader lang={lang} t={t.header} />
         {children}
+        <ScrollMoon />
       </body>
     </html>
   );
