@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { GatePoster } from "@/components/gate/GatePoster";
+import { GateScene } from "@/components/gate/GateScene";
 import { defaultLocale, isLocale, locales } from "@/lib/i18n";
 import { getMessages } from "@/lib/messages";
 
@@ -27,13 +28,13 @@ export default async function GatePage({ params }: PageProps<"/[lang]">) {
 
   return (
     <main>
-      <section aria-labelledby="gate-heading" data-header="ink" className="relative h-svh overflow-hidden bg-bark">
+      <GateScene labelledBy="gate-heading">
         <GatePoster alt={gate.posterAlt} />
         <div className="sr-only">
           <h1 id="gate-heading">{gate.heading}</h1>
           <p>{gate.intro}</p>
         </div>
-      </section>
+      </GateScene>
     </main>
   );
 }

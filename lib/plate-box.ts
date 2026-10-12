@@ -60,6 +60,12 @@ export const GATE_ANCHOR: Readonly<Anchor> = { x: 0.5, y: 0.55 };
  */
 export const GATE_TALL_ANCHOR: Readonly<Anchor> = { x: 0.561, y: 0.6 };
 
+/**
+ * Framing of the square plates. The ride through the gate lands here and the
+ * square scene starts from it, so the hand-off between them is invisible.
+ */
+export const SQUARE_ANCHOR: Readonly<Anchor> = { x: 0.5, y: 0.5 };
+
 /** Screens narrower than 4:5 get the portrait plate. */
 export const TALL_ASPECT_BELOW = 4 / 5;
 
