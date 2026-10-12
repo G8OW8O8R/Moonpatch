@@ -10,6 +10,7 @@ import { type Engine, type EngineEvents, type EngineSetup, type FromWorker, type
 
 export interface GateController {
   setProgress(progress: number): void;
+  setRide(target: 0 | 1): void;
   setParams(params: RigParams): void;
   resize(css: Size): void;
   setActive(active: boolean): void;
@@ -24,6 +25,8 @@ export interface GateCallbacks {
   /** The screen switched between the landscape and portrait plate: start over. */
   onPlateChange(): void;
   onStats?(stats: FrameStats): void;
+  /** The timed ride has arrived: the page may scroll again. */
+  onRideSettled?(ride: 0 | 1): void;
 }
 
 /** The engine behind a worker, driven by messages. */
@@ -34,6 +37,7 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
     const message = event.data;
     if (message.type === "ready") callbacks.onReady();
     else if (message.type === "fail") callbacks.onFail(message.reason);
+    else if (message.type === "settled") callbacks.onRideSettled(message.ride);
     else callbacks.onStats(message.stats);
   };
   worker.onerror = () => callbacks.onFail("worker failed");
@@ -41,6 +45,7 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
   send({ type: "init", canvas: offscreen, setup }, [offscreen]);
   return {
     setProgress: (progress) => send({ type: "progress", progress }),
+    setRide: (target) => send({ type: "ride", target }),
     setParams: (params) => send({ type: "params", params }),
     resize: (css, dpr) => send({ type: "resize", css, dpr }),
     setActive: (active) => send({ type: "active", active }),
@@ -77,6 +82,7 @@ export function startGate(
       callbacks.onFail(reason);
     },
     onStats: (stats: FrameStats) => callbacks.onStats?.(stats),
+    onRideSettled: (ride) => callbacks.onRideSettled?.(ride),
   };
 
   // The poster's file and natural size are only final once it has decoded.
@@ -101,6 +107,7 @@ export function startGate(
 
   return {
     setProgress: (progress) => withEngine((e) => e.setProgress(progress)),
+    setRide: (target) => withEngine((e) => e.setRide(target)),
     setParams: (params) => withEngine((e) => e.setParams(params)),
     resize(next) {
       css = next;

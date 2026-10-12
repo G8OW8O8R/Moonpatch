@@ -63,8 +63,6 @@ ${screenPixel}
 ${plates}
 uniform vec2 uOrigin;   // window origin, device px
 uniform float uScale;   // device px per plate px
-uniform vec2 uCentre;   // principal point on the plate
-uniform float uZoom;    // push into the square around the principal point
 uniform float uAlpha;
 uniform vec4 uPosterScreen; // when z > 0: the <img> box on screen, to sample the poster exactly as the browser does
 out vec4 outColour;
@@ -74,8 +72,7 @@ void main() {
     outColour = vec4(textureLod(uPoster, uv, max(uPosterLod, 0.0)).rgb * uAlpha, uAlpha);
     return;
   }
-  vec2 image = (screenPixel() - uOrigin) / uScale;
-  vec2 p = uCentre + (image - uCentre) / uZoom;
+  vec2 p = (screenPixel() - uOrigin) / uScale;
   outColour = vec4(plateColour(p) * uAlpha, uAlpha);
 }
 `;

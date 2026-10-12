@@ -25,8 +25,10 @@ const controls: Control[] = [
   { key: "sunElevation", label: "Sun elevation (°)", min: 4, max: 60, step: 1 },
   { key: "squareDepth", label: "Square depth (×)", min: 2, max: 20, step: 0.5 },
   { key: "travel", label: "Ride length (×)", min: 1.2, max: 2.5, step: 0.05 },
-  { key: "push", label: "Square push", min: 0, max: 0.15, step: 0.005 },
   { key: "openEnd", label: "Opening share", min: 0.2, max: 0.6, step: 0.01 },
+  { key: "followSpeed", label: "Follow limit (sections/s)", min: 0.2, max: 3, step: 0.05 },
+  { key: "threshold", label: "Ride threshold", min: 0.41, max: 0.9, step: 0.01 },
+  { key: "rideDuration", label: "Ride length (s)", min: 0.6, max: 3, step: 0.05 },
 ];
 
 const format = (n: number) => (Math.abs(n) >= 10 ? n.toFixed(0) : n.toFixed(2));

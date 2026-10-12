@@ -4,7 +4,7 @@
  * the textures that suit the screen, loads them, and draws frames only while
  * something moves.
  */
-import { type RigParams, endWindow, restWindow } from "@/lib/gate-rig";
+import { type Follower, type RigParams, endWindow, followOpening, restWindow, settledState } from "@/lib/gate-rig";
 import type { PosterPlate, Size } from "@/lib/plate-box";
 import { type FrameStats, GateRenderer, type GateImages, gateLayers } from "./GateRenderer";
 
@@ -21,6 +21,7 @@ export interface EngineSetup {
   css: Size;
   dpr: number;
   params: RigParams;
+  /** Scroll progress through the section (0–1). */
   progress: number;
 }
 
@@ -28,10 +29,14 @@ export interface EngineEvents {
   onReady(): void;
   onFail(reason: string): void;
   onStats(stats: FrameStats): void;
+  /** The timed ride has arrived where it was sent (1 on the square, 0 back at the gate). */
+  onRideSettled(ride: 0 | 1): void;
 }
 
 export interface Engine {
   setProgress(progress: number): void;
+  /** Plays the ride forwards (1) or back (0). */
+  setRide(target: 0 | 1): void;
   setParams(params: RigParams): void;
   resize(css: Size, dpr: number): void;
   setActive(active: boolean): void;
@@ -42,13 +47,18 @@ export interface Engine {
 export type ToWorker =
   | { type: "init"; canvas: OffscreenCanvas; setup: EngineSetup }
   | { type: "progress"; progress: number }
+  | { type: "ride"; target: 0 | 1 }
   | { type: "params"; params: RigParams }
   | { type: "resize"; css: Size; dpr: number }
   | { type: "active"; active: boolean }
   | { type: "dispose" };
 
 /** Messages from the worker to the page. */
-export type FromWorker = { type: "ready" } | { type: "fail"; reason: string } | { type: "stats"; stats: FrameStats };
+export type FromWorker =
+  | { type: "ready" }
+  | { type: "fail"; reason: string }
+  | { type: "stats"; stats: FrameStats }
+  | { type: "settled"; ride: 0 | 1 };
 
 /** Device pixels per plate pixel above which the full-size layers are worth their weight. */
 const FULL_SIZE_FROM = 0.55;
@@ -95,6 +105,12 @@ function frameScheduler(): { request: FrameRequest; cancel: (id: number) => void
 
 export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: EngineSetup, events: EngineEvents): Engine {
   let { css, dpr, params, progress } = setup;
+  // A page opened mid-way shows the settled scene at once; motion starts from there.
+  const settled = settledState(progress, params);
+  let opening: Follower = { value: settled.opening, velocity: 0 };
+  let ride = settled.ride;
+  let rideTarget: 0 | 1 = settled.ride === 1 ? 1 : 0;
+  let lastFrame = 0;
   let active = true;
   let disposed = false;
   let renderer: GateRenderer | null = null;
@@ -123,15 +139,28 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
   const frame = (now: number) => {
     raf = 0;
     if (!renderer || !active || disposed) return;
-    const settling = renderer.render(progress, params, now);
-    // Keep drawing every frame while the scroll moves, so motion is smooth and its pace measurable.
-    const busy = settling || now - movedAt < 160;
+    // Frame time, capped so a stall (a hidden tab) never turns into a jump.
+    const dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0;
+    lastFrame = now;
+
+    opening = followOpening(opening, Math.min(1, Math.max(0, progress / params.openEnd)), dt, params);
+    const riding = ride !== rideTarget;
+    if (riding) {
+      const step = dt / params.rideDuration;
+      ride = rideTarget === 1 ? Math.min(1, ride + step) : Math.max(0, ride - step);
+      if (ride === rideTarget) events.onRideSettled(rideTarget);
+    }
+    renderer.render({ opening: opening.value, ride }, params, riding);
+
+    // Keep drawing every frame while anything moves, so motion is smooth and its pace measurable.
+    const busy = riding || opening.velocity !== 0 || now - movedAt < 160;
     if (busy) renderer.recordFrame(now);
     if (!ready) {
       ready = true;
       events.onReady();
     }
     if (busy) schedule();
+    else lastFrame = 0;
   };
 
   const schedule = () => {
@@ -186,6 +215,11 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
       if (next === progress) return;
       progress = next;
       movedAt = performance.now();
+      schedule();
+    },
+    setRide(target) {
+      if (target === rideTarget) return;
+      rideTarget = target;
       schedule();
     },
     setParams(next) {

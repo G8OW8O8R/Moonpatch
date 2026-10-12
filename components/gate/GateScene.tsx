@@ -3,7 +3,7 @@
 import "lenis/dist/lenis.css";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { type RigParams, defaultRig } from "@/lib/gate-rig";
-import { PLATE, SQUARE_ANCHOR, coverSizes, objectPosition } from "@/lib/plate-box";
+import { PLATE, SQUARE_ANCHOR, type Size, coverSizes, objectPosition, squareBox } from "@/lib/plate-box";
 import type { FrameStats } from "./renderer/GateRenderer";
 import type { GateController } from "./renderer/start";
 
@@ -31,7 +31,22 @@ const squareSrcSet = (format: "avif" | "webp") =>
 
 /** square-golden in its own framing: where the ride lands, and what the fallback fades to. */
 function SquarePlate({ shown }: { shown: boolean }) {
+  const frame = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<Size | null>(null);
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setSize({ width: el.clientWidth, height: el.clientHeight }));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // The pushed-in frame of the square; a plain cover fit until the stage has been measured.
+  const box = size ? squareBox(size) : null;
+  const placement = box
+    ? { left: box.x, top: box.y, width: box.width, height: box.height }
+    : { inset: 0, width: "100%", height: "100%", objectFit: "cover" as const, objectPosition: objectPosition(SQUARE_ANCHOR) };
   return (
+    <div ref={frame} className="absolute inset-0 overflow-hidden">
     <picture>
       <source type="image/avif" srcSet={squareSrcSet("avif")} sizes={coverSizes(PLATE)} />
       <img
@@ -44,11 +59,18 @@ function SquarePlate({ shown }: { shown: boolean }) {
         height={PLATE.height}
         decoding="async"
         draggable={false}
-        style={{ objectPosition: objectPosition(SQUARE_ANCHOR) }}
-        className={`absolute inset-0 size-full object-cover transition-opacity duration-150 select-none ${shown ? "opacity-100" : "opacity-0"}`}
+        style={{ position: "absolute", maxWidth: "none", ...placement }}
+        className={`transition-opacity duration-150 select-none ${shown ? "opacity-100" : "opacity-0"}`}
       />
     </picture>
+    </div>
   );
+}
+
+interface ScrollLock {
+  stop(): void;
+  start(): void;
+  destroy(): void;
 }
 
 const whenIdle = (task: () => void) => {
@@ -77,6 +99,23 @@ export function GateScene({ children, labelledBy, length = 2.5, params = default
   const [restart, setRestart] = useState(0);
   const [stats, setStats] = useState<FrameStats>({ fps: 0, quality: 0 });
   const [debugProgress, setDebugProgress] = useState(0);
+  const lenis = useRef<ScrollLock | null>(null);
+  const modeRef = useRef<Mode>("poster");
+  const rideTarget = useRef<0 | 1>(0);
+  const holdTimer = useRef(0);
+
+  // While the timed ride plays, the page holds still inside the section; it lets go when the ride lands.
+  const release = useCallback(() => {
+    window.clearTimeout(holdTimer.current);
+    holdTimer.current = 0;
+    lenis.current?.start();
+  }, []);
+  const hold = useCallback(() => {
+    lenis.current?.stop();
+    window.clearTimeout(holdTimer.current);
+    // Never hold on for good, even if the scene goes quiet.
+    holdTimer.current = window.setTimeout(release, paramsRef.current.rideDuration * 1000 + 600);
+  }, [release]);
 
   const measure = useCallback(() => {
     const el = section.current;
@@ -87,10 +126,17 @@ export function GateScene({ children, labelledBy, length = 2.5, params = default
     const p = travel > 0 ? Math.min(1, Math.max(0, -rect.top / travel)) : 0;
     progress.current = p;
     controller.current?.setProgress(p);
+    // Crossing the threshold plays the ride forwards; coming back above it plays it back.
+    const target = p >= paramsRef.current.threshold ? 1 : 0;
+    if (target !== rideTarget.current) {
+      rideTarget.current = target;
+      controller.current?.setRide(target);
+      if (modeRef.current === "webgl") hold();
+    }
     setPastHalf(p >= 0.5);
     if (p > 0) setMoved(true);
     if (onDebug) setDebugProgress(p);
-  }, [onDebug]);
+  }, [onDebug, hold]);
 
   useEffect(() => {
     paramsRef.current = params;
@@ -104,11 +150,10 @@ export function GateScene({ children, labelledBy, length = 2.5, params = default
   // Scroll: smoothed wheel on desktop, native on touch, none of it under reduced motion.
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let lenis: { destroy(): void } | null = null;
     let cancelled = false;
     if (!reduced) {
       void import("lenis").then(({ default: Lenis }) => {
-        if (!cancelled) lenis = new Lenis({ autoRaf: true, smoothWheel: true, syncTouch: false });
+        if (!cancelled) lenis.current = new Lenis({ autoRaf: true, smoothWheel: true, syncTouch: false });
       });
     }
     measure();
@@ -116,7 +161,9 @@ export function GateScene({ children, labelledBy, length = 2.5, params = default
     window.addEventListener("resize", measure);
     return () => {
       cancelled = true;
-      lenis?.destroy();
+      window.clearTimeout(holdTimer.current);
+      lenis.current?.destroy();
+      lenis.current = null;
       window.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
     };
@@ -178,6 +225,7 @@ export function GateScene({ children, labelledBy, length = 2.5, params = default
               setRestart((n) => n + 1);
             },
             onStats: setStats,
+            onRideSettled: release,
           },
         );
         intersection.observe(section.current!);
@@ -194,12 +242,14 @@ export function GateScene({ children, labelledBy, length = 2.5, params = default
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [restart]);
+  }, [restart, release]);
 
-  // A fresh frame once the canvas is shown.
+  // A fresh frame once the canvas is shown; without the scene nothing may hold the page.
   useEffect(() => {
+    modeRef.current = mode;
     if (mode === "webgl") controller.current?.setParams(paramsRef.current);
-  }, [mode]);
+    else release();
+  }, [mode, release]);
 
   const showSquare = mode !== "webgl" && pastHalf;
   // Above 2× the canvas is drawn at 2× and upscaled, a touch softer than the poster:

@@ -12,7 +12,7 @@
  * the projection ends with a 2D window: screen = origin + scale · image.
  */
 import { type CubicBezier, ease, spring } from "./motion-tokens";
-import { PLATE, SQUARE_ANCHOR, type Size, TALL_OFFSET, plateBox, posterBox } from "./plate-box";
+import { PLATE, SQUARE_ANCHOR, type Size, TALL_OFFSET, posterBox, squareBox } from "./plate-box";
 
 export interface Vec2 {
   x: number;
@@ -53,13 +53,17 @@ export interface RigParams {
   stiffness: number;
   damping: number;
   mass: number;
-  /** Share of the section spent opening the gate; the rest is the ride in. */
+  /** Share of the section spent opening the gate. */
   openEnd: number;
+  /** Fastest the opening may follow the scroll, in sections per second: a flick catches up instead of jumping. */
+  followSpeed: number;
+  /** Share of the section past which the ride plays (and above which it plays back). */
+  threshold: number;
+  /** Length of the ride through the gate, in seconds. */
+  rideDuration: number;
   /** Where the camera stops, in gate distances from the start. */
   travel: number;
-  /** Extra push into the square at the peak of the ride (0.05 = 5 %). */
-  push: number;
-  /** Radial blur of the near layers at full speed, in CSS pixels. */
+  /** Radial blur of the near layers at the ride's top speed, in CSS pixels; never more. */
   blur: number;
   /** Opacity of the leaves' contact shadows. */
   shadowOpacity: number;
@@ -76,9 +80,11 @@ export const defaultRig: Readonly<RigParams> = {
   angle: 100,
   ...spring.hinge,
   openEnd: 0.4,
+  followSpeed: 0.9,
+  threshold: 0.45,
+  rideDuration: 1.4,
   travel: 1.55,
-  push: 0.05,
-  blur: 26,
+  blur: 14,
   shadowOpacity: 0.5,
   shade: 0.8,
   sunAzimuth: 55,
@@ -131,13 +137,13 @@ export function bezierEasing([x1, y1, x2, y2]: CubicBezier): (x: number) => numb
   };
 }
 
-// The ride is scrubbed by the scroll, so it eases in and out evenly; a hard brake would leave the last stretch of scroll idle.
-const rideEase = bezierEasing(ease.inOut);
+/** The ride is a timed move: it builds speed, then brakes softly onto the square. */
+const rideEase = bezierEasing(ease.camera);
 
 /**
  * Step response of the hinge spring, scaled so it ends exactly on 1 with zero
  * speed: the leaf swings a touch past its stop and eases back onto it. A pure
- * function of scroll position, so scrubbing back retraces the same swing.
+ * function of the opening, so closing the gate retraces the same swing.
  */
 export function hingeCurve(u: number, params: Pick<RigParams, "stiffness" | "damping" | "mass">): number {
   const t = clamp01(u);
@@ -172,63 +178,113 @@ export function restWindow(viewport: Size): PlateWindow {
   return { scale: box.scale, origin: { x: box.x + box.scale * shift.x, y: box.y + box.scale * shift.y } };
 }
 
-/** Window of square-golden.jpg in the square's framing: the last frame of the ride. */
+/** Window of square-golden.jpg in the square's framing (pushed in on the café): the last frame of the ride. */
 export function endWindow(viewport: Size): PlateWindow {
-  const box = plateBox(viewport, PLATE, SQUARE_ANCHOR);
+  const box = squareBox(viewport);
   return { scale: box.scale, origin: { x: box.x, y: box.y } };
 }
 
-export interface Camera {
-  /** Section progress this camera was built for. */
-  progress: number;
-  /** Opening angle of the leaves in radians. */
-  angle: number;
-  /** Rest focal length (plate px) — also the distance of the gate. */
-  focal0: number;
-  /** Current focal length: shortened as the camera dollies, so the square holds still. */
-  focal: number;
-  /** Camera position along Z. */
-  z: number;
-  /** Scale of the square around the principal point (1 at both ends of the ride). */
-  squareZoom: number;
-  /** The 2D crop that turns image coordinates into screen pixels. */
-  window: PlateWindow;
-  /** 0 → 1 across the opening, 0 → 1 across the ride. */
+/** What the scene shows: how far the gate is open and how far the timed ride has run (both 0–1). */
+export interface SceneState {
   opening: number;
   ride: number;
 }
 
-export function cameraAt(progress: number, viewport: Size, params: RigParams = defaultRig): Camera {
-  const p = clamp01(progress);
-  const opening = clamp01(p / params.openEnd);
-  const ride = clamp01((p - params.openEnd) / (1 - params.openEnd));
+/** The settled scene for a scroll position, for when there is nothing to animate (a page opened mid-way). */
+export function settledState(scroll: number, params: RigParams = defaultRig): SceneState {
+  return { opening: clamp01(scroll / params.openEnd), ride: scroll >= params.threshold ? 1 : 0 };
+}
+
+export interface Follower {
+  value: number;
+  velocity: number;
+}
+
+/**
+ * The opening trails the scroll on a critically damped spring with a speed
+ * limit, so a flick of the wheel plays the swing out instead of skipping it.
+ * It never passes its target, in either direction.
+ */
+export function followOpening(current: Follower, target: number, dt: number, params: RigParams = defaultRig): Follower {
+  const omega = 14;
+  const limit = params.followSpeed / params.openEnd;
+  let { value, velocity } = current;
+  const steps = Math.max(1, Math.ceil(dt / (1 / 240)));
+  const h = dt / steps;
+  for (let i = 0; i < steps; i++) {
+    const before = target - value;
+    velocity += (omega * omega * before - 2 * omega * velocity) * h;
+    velocity = Math.max(-limit, Math.min(limit, velocity));
+    value += velocity * h;
+    if (before === 0 || Math.sign(target - value) !== Math.sign(before)) {
+      value = target;
+      velocity = 0;
+    }
+  }
+  if (Math.abs(target - value) < 1e-4 && Math.abs(velocity) < 1e-3) return { value: target, velocity: 0 };
+  return { value, velocity };
+}
+
+/** Camera depth along the ride, in gate distances. */
+const rideDepth = (ride: number, params: RigParams) => rideEase(clamp01(ride)) * params.travel;
+
+/** Speed of the camera during the ride, in gate distances per second. */
+export function rideSpeed(ride: number, params: RigParams = defaultRig): number {
+  const h = 1e-3;
+  const a = rideDepth(Math.max(0, ride - h), params);
+  const b = rideDepth(Math.min(1, ride + h), params);
+  return (b - a) / (Math.min(1, ride + h) - Math.max(0, ride - h)) / params.rideDuration;
+}
+
+/** Top speed of the ride, for scaling the blur. */
+export function peakRideSpeed(params: RigParams = defaultRig): number {
+  let peak = 0;
+  for (let i = 0; i <= 200; i++) peak = Math.max(peak, rideSpeed(i / 200, params));
+  return peak;
+}
+
+export interface Camera {
+  /** Opening angle of the leaves in radians. */
+  angle: number;
+  /** Rest focal length (plate px) — also the distance of the gate. */
+  focal0: number;
+  /** Current focal length: shortened as the camera dollies, so the square only grows as the crop pushes in. */
+  focal: number;
+  /** Camera position along Z. */
+  z: number;
+  /** The 2D crop that turns image coordinates into screen pixels. */
+  window: PlateWindow;
+  opening: number;
+  ride: number;
+}
+
+export function cameraAt(state: SceneState, viewport: Size, params: RigParams = defaultRig): Camera {
+  const opening = clamp01(state.opening);
+  const ride = clamp01(state.ride);
   const e = rideEase(ride);
 
   const focal0 = focalPx(params);
-  // The arch leaves the frame within the first third of the travel: give that stretch more of the scroll.
-  const z = e ** 1.5 * params.travel * focal0;
-  const squareZoom = 1 + 4 * params.push * e * (1 - e);
+  const z = rideDepth(ride, params) * focal0;
   const depth = params.squareDepth * focal0;
-  // Dolly zoom: the lens widens as the camera moves so the far square keeps its size.
-  const focal = (squareZoom * focal0 * (depth - z)) / depth;
+  // Dolly zoom: the lens widens as the camera moves, so the square's growth comes from the crop alone.
+  const focal = (focal0 * (depth - z)) / depth;
 
+  // The crop pushes in from the poster's frame to the square's, closing evenly on the café.
   const from = restWindow(viewport);
   const to = endWindow(viewport);
-  // The principal point glides across the screen while the crop zooms evenly.
+  const focus = { x: SQUARE_ANCHOR.focus.u * PLATE.width, y: SQUARE_ANCHOR.focus.v * PLATE.height };
   const scale = from.scale * Math.pow(to.scale / from.scale, e);
   const anchor = {
-    x: lerp(from.origin.x + from.scale * PRINCIPAL.x, to.origin.x + to.scale * PRINCIPAL.x, e),
-    y: lerp(from.origin.y + from.scale * PRINCIPAL.y, to.origin.y + to.scale * PRINCIPAL.y, e),
+    x: lerp(from.origin.x + from.scale * focus.x, to.origin.x + to.scale * focus.x, e),
+    y: lerp(from.origin.y + from.scale * focus.y, to.origin.y + to.scale * focus.y, e),
   };
-  const window = { scale, origin: { x: anchor.x - scale * PRINCIPAL.x, y: anchor.y - scale * PRINCIPAL.y } };
+  const window = { scale, origin: { x: anchor.x - scale * focus.x, y: anchor.y - scale * focus.y } };
 
   return {
-    progress: p,
     angle: ((params.angle * Math.PI) / 180) * hingeCurve(opening, params),
     focal0,
     focal,
     z,
-    squareZoom,
     window,
     opening,
     ride,
@@ -248,10 +304,7 @@ export function project(camera: Camera, point: Vec3): Vec2 | null {
 
 /** Where a pixel of the square plate lands on screen. */
 export function projectSquare(camera: Camera, pixel: Vec2): Vec2 {
-  return toScreen(camera.window, {
-    x: PRINCIPAL.x + camera.squareZoom * (pixel.x - PRINCIPAL.x),
-    y: PRINCIPAL.y + camera.squareZoom * (pixel.y - PRINCIPAL.y),
-  });
+  return toScreen(camera.window, pixel);
 }
 
 export function toScreen(window: PlateWindow, image: Vec2): Vec2 {

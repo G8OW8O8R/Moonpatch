@@ -5,12 +5,15 @@ import {
   type LeafSide,
   PRINCIPAL,
   type RigParams,
+  type SceneState,
   type Vec3,
   cameraAt,
   groundDepth,
   leafPoint,
   leafShade,
+  peakRideSpeed,
   restWindow,
+  rideSpeed,
   shadowOnGround,
   unproject,
 } from "@/lib/gate-rig";
@@ -92,8 +95,6 @@ const LEAF_AREA = { x0: 404, y0: 850, x1: 2212, y1: 1400 };
 /** Rows over which the road takes over from the square below the gate line. */
 const ROAD_FEATHER: readonly [number, number] = [1356, 1368];
 
-/** Camera speed (gate distances per second) at which the near layers smear fully. */
-const FULL_BLUR_SPEED = 3;
 
 export class GateRenderer {
   private readonly gl: GL;
@@ -122,9 +123,7 @@ export class GateRenderer {
   private maxDpr = 2;
   private blurAllowed = true;
 
-  private lastZ = 0;
-  private lastTime = 0;
-  private speed = 0;
+  private peakSpeed = { params: null as RigParams | null, value: 1 };
   private frameTimes: number[] = [];
   private reportedAt = 0;
   private stats: FrameStats = { fps: 0, quality: 0 };
@@ -218,18 +217,17 @@ export class GateRenderer {
     return this.stats;
   }
 
-  /**
-   * Draws one frame. Returns true while the picture is still settling (the
-   * motion blur fading out), so the caller keeps asking for frames.
-   */
-  render(progress: number, params: RigParams, now: number): boolean {
+  /** Draws one frame of the scene; `riding` while the timed ride is under way. */
+  render(state: SceneState, params: RigParams, riding: boolean) {
     const { gl } = this;
-    const camera = cameraAt(progress, this.css, params);
+    const camera = cameraAt(state, this.css, params);
     const width = this.canvas.width;
     const height = this.canvas.height;
 
-    this.trackSpeed(camera, now);
-    const blurPx = this.blurAllowed ? params.blur * Math.min(1, this.speed / FULL_BLUR_SPEED) : 0;
+    // The smear follows the camera's own speed along the timed ride, capped at the blur setting.
+    if (this.peakSpeed.params !== params) this.peakSpeed = { params, value: peakRideSpeed(params) };
+    const pace = riding ? Math.min(1, rideSpeed(camera.ride, params) / this.peakSpeed.value) : 0;
+    const blurPx = this.blurAllowed ? params.blur * pace * pace : 0;
 
     const opening = camera.opening;
     const dissolve = smoothstep(0, 0.8, opening);
@@ -243,7 +241,7 @@ export class GateRenderer {
 
     // The square, far behind everything.
     gl.disable(gl.BLEND);
-    this.drawBackdrop(camera.window.origin, camera.window.scale, camera.squareZoom, dissolve, under, 1);
+    this.drawBackdrop(camera.window.origin, camera.window.scale, dissolve, under, 1);
 
     // Shadows of the leaves on the road beyond the gate line.
     const shadowStrength = params.shadowOpacity * smoothstep(0, 0.25, opening);
@@ -318,10 +316,9 @@ export class GateRenderer {
     if (posterAlpha > 0) {
       const rest = restWindow(this.css);
       const box = this.posterBox();
-      this.drawBackdrop(rest.origin, rest.scale, 1, 0, 0, posterAlpha, box);
+      this.drawBackdrop(rest.origin, rest.scale, 0, 0, posterAlpha, box);
     }
 
-    return this.speed > 0.02 || blurring;
   }
 
   /** Frame pacing while the scene moves: reported twice a second, and quality drops when it cannot keep up. */
@@ -387,20 +384,6 @@ export class GateRenderer {
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, lod: texelsPerPixel < 2 ? 0 : Math.floor(Math.log2(texelsPerPixel)) };
   }
 
-  private trackSpeed(camera: Camera, now: number) {
-    const dt = (now - this.lastTime) / 1000;
-    const z = camera.z / camera.focal0;
-    if (this.lastTime === 0 || dt <= 0 || dt > 0.25) {
-      this.speed = 0;
-    } else {
-      const instant = Math.abs(z - this.lastZ) / dt;
-      this.speed += (instant - this.speed) * (1 - Math.exp(-dt / 0.08));
-      if (this.speed < 0.01) this.speed = 0;
-    }
-    this.lastZ = z;
-    this.lastTime = now;
-  }
-
   private bindTexture(program: Program, name: string, texture: WebGLTexture | undefined, unit: number) {
     const { gl } = this;
     gl.activeTexture(gl.TEXTURE0 + unit);
@@ -430,7 +413,6 @@ export class GateRenderer {
   private drawBackdrop(
     origin: { x: number; y: number },
     scale: number,
-    zoom: number,
     dissolve: number,
     under: number,
     alpha: number,
@@ -447,8 +429,6 @@ export class GateRenderer {
     gl.uniform2f(p.uniform("uViewport"), this.canvas.width, this.canvas.height);
     gl.uniform2f(p.uniform("uOrigin"), origin.x * this.dpr, origin.y * this.dpr);
     gl.uniform1f(p.uniform("uScale"), scale * this.dpr);
-    gl.uniform2f(p.uniform("uCentre"), PRINCIPAL.x, PRINCIPAL.y);
-    gl.uniform1f(p.uniform("uZoom"), zoom);
     gl.uniform1f(p.uniform("uAlpha"), alpha);
     this.bindPlates(p, dissolve, under, poster?.lod ?? -1);
     gl.uniform4f(p.uniform("uPosterScreen"), poster?.x ?? 0, poster?.y ?? 0, poster?.w ?? 0, poster?.h ?? 0);

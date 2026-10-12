@@ -60,11 +60,27 @@ export const GATE_ANCHOR: Readonly<Anchor> = { x: 0.5, y: 0.55 };
  */
 export const GATE_TALL_ANCHOR: Readonly<Anchor> = { x: 0.561, y: 0.6 };
 
+/** A cover fit pushed in further around a point of the plate. */
+export interface Framing extends Anchor {
+  /** Extra magnification over the cover fit (1 = plain cover). */
+  zoom: number;
+  /** The point the push-in closes on; it keeps its place on screen. */
+  focus: PlatePoint;
+}
+
 /**
- * Framing of the square plates. The ride through the gate lands here and the
- * square scene starts from it, so the hand-off between them is invisible.
+ * Framing of the square plates. The ride through the gate pushes in on the
+ * café, a little towards the road, and lands here; the square scene starts
+ * from the same frame, so the hand-off between them is invisible. Portrait
+ * screens already travel a long way in from the tall gate, so they keep the
+ * plain cover fit.
  */
-export const SQUARE_ANCHOR: Readonly<Anchor> = { x: 0.5, y: 0.5 };
+export const SQUARE_ANCHOR: Readonly<Framing> = {
+  x: 0.5,
+  y: 0.5,
+  zoom: 1.12,
+  focus: { u: 1280 / 2576, v: 960 / 1438 },
+};
 
 /** Screens narrower than 4:5 get the portrait plate. */
 export const TALL_ASPECT_BELOW = 4 / 5;
@@ -150,6 +166,33 @@ export function posterBox(viewport: Size): { plate: PosterPlate; box: PlateBox }
 export function gateToViewport(viewport: Size, point: PlatePoint): ViewportPoint {
   const { plate, box } = posterBox(viewport);
   return plateToViewport(box, plate === "gate-tall" ? gateToTall(point) : point);
+}
+
+/**
+ * Box of a plate under a framing: the cover fit, scaled around the focus,
+ * then nudged back so the plate still covers the whole viewport.
+ */
+export function framedBox(viewport: Size, plate: Size, framing: Framing): PlateBox {
+  const base = plateBox(viewport, plate, framing);
+  const zoom = Math.max(1, framing.zoom);
+  const width = base.width * zoom;
+  const height = base.height * zoom;
+  const fx = base.x + framing.focus.u * base.width;
+  const fy = base.y + framing.focus.v * base.height;
+  const clampTo = (value: number, min: number) => Math.min(0, Math.max(min, value)) + 0;
+  return {
+    scale: base.scale * zoom,
+    width,
+    height,
+    x: clampTo(fx - framing.focus.u * width, viewport.width - width),
+    y: clampTo(fy - framing.focus.v * height, viewport.height - height),
+  };
+}
+
+/** Where square-golden sits on this viewport: pushed in on landscape screens, plain cover on portrait ones. */
+export function squareBox(viewport: Size): PlateBox {
+  const portrait = posterPlate(viewport) === "gate-tall";
+  return framedBox(viewport, PLATE, portrait ? { ...SQUARE_ANCHOR, zoom: 1 } : SQUARE_ANCHOR);
 }
 
 /** CSS `object-position` that reproduces `plateBox` for the same anchor. */

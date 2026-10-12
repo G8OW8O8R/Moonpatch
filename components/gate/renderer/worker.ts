@@ -17,10 +17,14 @@ scope.onmessage = (event: MessageEvent<ToWorker>) => {
         onReady: () => post({ type: "ready" }),
         onFail: (reason) => post({ type: "fail", reason }),
         onStats: (stats) => post({ type: "stats", stats }),
+        onRideSettled: (ride) => post({ type: "settled", ride }),
       });
       break;
     case "progress":
       engine?.setProgress(message.progress);
+      break;
+    case "ride":
+      engine?.setRide(message.target);
       break;
     case "params":
       engine?.setParams(message.params);

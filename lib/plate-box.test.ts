@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   CENTER,
   GATE_ANCHOR,
+  SQUARE_ANCHOR,
   PLATE,
   PLATE_TALL,
   coverSizes,
+  framedBox,
   gateToTall,
   gateToViewport,
   objectPosition,
@@ -12,6 +14,7 @@ import {
   plateToViewport,
   posterBox,
   posterPlate,
+  squareBox,
   tallToGate,
   viewportToPlate,
 } from "./plate-box";
@@ -165,5 +168,33 @@ describe("portrait gate plate", () => {
     expect(box.width / box.height).toBeCloseTo(PLATE_TALL.width / PLATE_TALL.height, 10);
     expect(box.height).toBeCloseTo(844, 10);
     expect(coverSizes(PLATE_TALL)).toBe("(max-aspect-ratio: 2552/4577) 55.76vh, 100vw");
+  });
+});
+
+describe("framedBox", () => {
+  it.each(viewports)("pushes in around the focus and still covers $width×$height", (viewport) => {
+    const framing = { ...SQUARE_ANCHOR, zoom: 1.12 };
+    const base = plateBox(viewport, PLATE, framing);
+    const box = framedBox(viewport, PLATE, framing);
+    expect(box.scale).toBeCloseTo(base.scale * 1.12, 10);
+    expect(box.x).toBeLessThanOrEqual(0);
+    expect(box.y).toBeLessThanOrEqual(0);
+    expect(box.x + box.width).toBeGreaterThanOrEqual(viewport.width - 1e-9);
+    expect(box.y + box.height).toBeGreaterThanOrEqual(viewport.height - 1e-9);
+  });
+
+  it("keeps the focus where the cover fit put it when there is room", () => {
+    const viewport = { width: 1536, height: 864 };
+    const base = plateBox(viewport, PLATE, SQUARE_ANCHOR);
+    const box = framedBox(viewport, PLATE, SQUARE_ANCHOR);
+    const { u, v } = SQUARE_ANCHOR.focus;
+    expect(box.x + u * box.width).toBeCloseTo(base.x + u * base.width, 6);
+    expect(box.y + v * box.height).toBeCloseTo(base.y + v * base.height, 6);
+  });
+
+  it("is the plain cover fit at zoom 1, as square framing is on portrait screens", () => {
+    const phone = { width: 390, height: 844 };
+    expect(squareBox(phone)).toEqual(plateBox(phone, PLATE, SQUARE_ANCHOR));
+    expect(framedBox(phone, PLATE, { ...SQUARE_ANCHOR, zoom: 1 })).toEqual(plateBox(phone, PLATE, SQUARE_ANCHOR));
   });
 });
