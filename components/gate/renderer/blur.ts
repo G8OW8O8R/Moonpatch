@@ -17,8 +17,8 @@ import { type GL, type Program, type Target, createMipTarget, deleteTarget, fini
 const TAPS = 16;
 
 /**
- * The exposure is matched in the vertex stage: an 8×8 grid over a mip some
- * ten texels across, never the last 1×1 mip (odd sizes lose whole rows on
+ * The exposure is matched in the vertex stage: a 16×16 grid over a mip some
+ * thirty texels across, never the last 1×1 mip (odd sizes lose whole rows on
  * the way down there).
  */
 const vertex = /* glsl */ `#version 300 es
@@ -35,9 +35,9 @@ const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 float mean(sampler2D image, float lod) {
   float sum = 0.0;
-  for (int y = 0; y < 8; y++)
-    for (int x = 0; x < 8; x++) sum += dot(textureLod(image, (vec2(x, y) + 0.5) / 8.0, lod).rgb, LUMA);
-  return sum / 64.0;
+  for (int y = 0; y < 16; y++)
+    for (int x = 0; x < 16; x++) sum += dot(textureLod(image, (vec2(x, y) + 0.5) / 16.0, lod).rgb, LUMA);
+  return sum / 256.0;
 }
 
 void main() {
@@ -57,13 +57,16 @@ uniform vec2 uViewport;     // device px
 uniform float uK;           // field: a point x (device px, from the top left) moves along uK·x + uB
 uniform vec2 uB;
 uniform float uLength;      // device px of smear where the field is 1
+uniform float uFloor;       // the least any point is smeared, in the field's units (the still middle of a zoom too)
 flat in float vGain;
 out vec4 outColour;
 
 void main() {
   vec2 frag = gl_FragCoord.xy;
   vec2 p = vec2(frag.x, uViewport.y - frag.y);
-  vec2 v = (uK * p + uB) * uLength;
+  vec2 d = uK * p + uB;
+  float m = length(d);
+  vec2 v = (m > 1e-5 ? d / m : vec2(1.0, 0.0)) * max(m, uFloor) * uLength;
   // The field is from the top left; the buffer is from the bottom left.
   vec2 step = vec2(v.x, -v.y) / uViewport;
   vec2 uv = frag / uViewport;
@@ -87,15 +90,17 @@ export interface BlurFrame {
   /** Unit field, device px: the fastest corner of the screen moves 1. */
   k: number;
   b: { x: number; y: number };
-  /** Smear of that fastest corner, device px. */
+  /** Smear of that fastest corner, CSS px (the field carries the device scale). */
   length: number;
+  /** The least any point is smeared, in the field's units. */
+  floor: number;
   /** Towards the other frame's exposure, 0–1, and that frame (a mipmapped texture of its own size). */
   exposure: number;
   other: { texture: WebGLTexture; width: number; height: number } | null;
 }
 
-/** The mip about ten texels across: coarse enough to average, fine enough to have lost nothing. */
-const meanLod = (width: number, height: number) => Math.max(0, Math.floor(Math.log2(Math.max(width, height) / 10)));
+/** The mip about thirty texels across: coarse enough to average, fine enough to have lost nothing. */
+const meanLod = (width: number, height: number) => Math.max(0, Math.floor(Math.log2(Math.max(width, height) / 30)));
 
 export class MotionBlurPass {
   private readonly gl: GL;
@@ -147,6 +152,7 @@ export class MotionBlurPass {
     gl.uniform1f(p.uniform("uK"), frame.k);
     gl.uniform2f(p.uniform("uB"), frame.b.x, frame.b.y);
     gl.uniform1f(p.uniform("uLength"), frame.length);
+    gl.uniform1f(p.uniform("uFloor"), frame.floor);
     gl.uniform1f(p.uniform("uExposure"), frame.other ? frame.exposure : 0);
     gl.uniform1f(p.uniform("uFrameLod"), meanLod(buffer.width, buffer.height));
     gl.uniform1f(p.uniform("uOtherLod"), frame.other ? meanLod(frame.other.width, frame.other.height) : 0);

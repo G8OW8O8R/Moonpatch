@@ -414,6 +414,7 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
         k: field.k,
         b: { x: field.b.x * ratio, y: field.b.y * ratio },
         length: blur,
+        floor: door.blurCentre * ratio,
         exposure,
         other: exposure > 0 ? roomRenderer!.meanSource(room) : null,
       });

@@ -120,7 +120,7 @@ const prefersReduced = () => window.matchMedia("(prefers-reduced-motion: reduce)
 const startedCanvases = new WeakSet<HTMLCanvasElement>();
 
 /** Buildings the camera flies into; the others still open on their own pages. */
-const ROOMS_IN_SCENE: ReadonlySet<RoomId> = new Set<RoomId>(["cafe"]);
+const ROOMS_IN_SCENE: ReadonlySet<RoomId> = new Set<RoomId>(["cafe", "barn", "haunt"]);
 
 /** Set once a scene has left the page for another place on the farm: coming back to one is a return. */
 let sceneLeft = false;
@@ -184,12 +184,18 @@ export function GateScene({
   const paramsRef = useRef(params);
   const doorRef = useRef(door);
   const onJourneyRef = useRef(onJourney);
-  /** The building the camera is in, from the cut on (null out on the square). */
+  /**
+   * The building the camera has come to rest in (its copy is shown), and the one it is in from the
+   * cut on. Nothing React renders changes while a move plays: the page only touches the DOM then.
+   */
   const [inside, setInside] = useState<RoomId | null>(null);
   const insideRef = useRef<RoomId | null>(null);
   /** On the way into a building, inside it, or on the way out: the square's own layer stands aside. */
-  const [away, setAway] = useState(false);
   const awayRef = useRef(false);
+  /** A move to or from a building is playing: nothing may render on the page until it lands. */
+  const moving = useRef(false);
+  const squareLayer = useRef<HTMLDivElement>(null);
+  const roomLayer = useRef<HTMLDivElement>(null);
   /** The building was entered from the square in this visit, so the way out is the browser's way back. */
   const roomFromHere = useRef(false);
   const trackRef = useRef(track);
@@ -199,6 +205,13 @@ export function GateScene({
   const [moved, setMoved] = useState(false);
   const [restart, setRestart] = useState(0);
   const [stats, setStats] = useState<FrameStats>({ fps: 0, quality: 0 });
+  const latestStats = useRef<FrameStats>({ fps: 0, quality: 0 });
+  const debugging = !!onDebug;
+  /** The scene's frame rate, for the lab only, and never shown in the middle of a move. */
+  const reportStats = useCallback((next: FrameStats) => {
+    latestStats.current = next;
+    if (debugging && !moving.current) setStats(next);
+  }, [debugging]);
   const [debugProgress, setDebugProgress] = useState(0);
   const [arrived, setArrived] = useState(false);
   /** The board was opened from the square in this visit (not arrived on at its own address). */
@@ -478,38 +491,77 @@ export function GateScene({
     }
   }, [square.lang]);
 
-  // Into a building and out again: the scene plays the move; the page only says where to go.
-  useEffect(() => {
-    const c = controller.current;
-    if (room) {
-      if (modeRef.current !== "webgl" || !c) return;
-      awayRef.current = true;
-      setAway(true);
-      lenis.current?.stop();
-      c.setPlace(room);
-    } else if (awayRef.current) {
-      c?.setPlace("square");
-    }
-  }, [room]);
+  /** The square's own layer (its buttons and lines) stands aside for a move to a building, or comes back. */
+  const showSquareLayer = useCallback((shown: boolean) => {
+    awayRef.current = !shown;
+    const el = squareLayer.current;
+    if (!el) return;
+    el.inert = !shown;
+    if (shown) delete el.dataset.away;
+    else el.dataset.away = "";
+  }, []);
 
-  /** The camera has cut across: the header and the room's own copy follow it. */
+  /** The room's own copy, hidden the moment the way out begins. */
+  const showRoomLayer = useCallback((shown: boolean) => {
+    const el = roomLayer.current;
+    if (!el) return;
+    el.inert = !shown;
+    el.style.opacity = shown ? "" : "0";
+  }, []);
+
+  /** Starts a move. The address follows once it has landed, so no render of the page falls inside it. */
+  const goTo = useCallback(
+    (place: ScenePlace) => {
+      const c = controller.current;
+      if (!c) return;
+      if (place === "square") showRoomLayer(false);
+      else if (!awayRef.current) {
+        showSquareLayer(false);
+        lenis.current?.stop();
+      }
+      moving.current = true;
+      c.setPlace(place);
+    },
+    [showRoomLayer, showSquareLayer],
+  );
+
+  // The browser's back and forward (and any other change of address) move the camera too.
+  useEffect(() => {
+    if (room) {
+      if (modeRef.current === "webgl") goTo(room);
+    } else if (awayRef.current) {
+      goTo("square");
+    }
+  }, [room, goTo]);
+
+  /** The camera has cut across: only the header follows it now, the rest once it has landed. */
   const cutTo = useCallback((place: ScenePlace) => {
     const next = place === "square" ? null : place;
     insideRef.current = next;
-    setInside(next);
     if (next && section.current) section.current.dataset.header = "paper";
     else driver.current?.refresh();
   }, []);
 
-  /** A move has landed: inside, the square waits under the room at the end of its path; outside, the page scrolls again. */
+  /**
+   * A move has landed. Inside, the square waits under the room at the end of its path; outside, the
+   * page scrolls again. Only now does the address change, and the page render with it.
+   */
   const placed = useCallback(
     (place: ScenePlace) => {
+      moving.current = false;
+      reportStats(latestStats.current);
       const html = document.documentElement;
+      const at = placeAt(window.location.pathname)?.place;
       if (place === "square") {
-        awayRef.current = false;
-        setAway(false);
+        showSquareLayer(true);
         html.style.overflow = "";
         if (!boardOpenRef.current) lenis.current?.start();
+        setInside(null);
+        if (isRoomId(at)) {
+          if (roomFromHere.current) window.history.back();
+          else window.history.pushState(null, "", placePath(square.lang, "square"));
+        }
+        roomFromHere.current = false;
         return;
       }
       const el = section.current;
@@ -518,8 +570,14 @@ export function GateScene({
       measure();
       driver.current?.follow(1, 1, true);
       html.style.overflow = "hidden";
+      showRoomLayer(true);
+      setInside(place);
+      if (at !== place) {
+        roomFromHere.current = true;
+        window.history.pushState(null, "", placePath(square.lang, place));
+      }
     },
-    [measure],
+    [measure, reportStats, showRoomLayer, showSquareLayer, square.lang],
   );
 
   useEffect(() => () => void (document.documentElement.style.overflow = ""), []);
@@ -530,29 +588,21 @@ export function GateScene({
       if (!ROOMS_IN_SCENE.has(arm) || modeRef.current !== "webgl" || rideAt.current !== 1 || !squareReady.current) return;
       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
-      roomFromHere.current = true;
-      window.history.pushState(null, "", placePath(square.lang, arm));
+      goTo(arm);
     },
-    [square.lang],
+    [goTo],
   );
 
-  const leaveRoom = useCallback(() => {
-    if (roomFromHere.current) {
-      roomFromHere.current = false;
-      window.history.back();
-    } else {
-      window.history.pushState(null, "", placePath(square.lang, "square"));
-    }
-  }, [square.lang]);
+  const leaveRoom = useCallback(() => goTo("square"), [goTo]);
 
+  // Esc leaves a building, or turns the way in around before it lands.
   useEffect(() => {
-    if (!inside) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") leaveRoom();
+      if (event.key === "Escape" && awayRef.current) leaveRoom();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [inside, leaveRoom]);
+  }, [leaveRoom]);
 
   /** Inside, a mouse moves the room a little. */
   const point = useCallback((event: PointerEvent<HTMLDivElement>) => {
@@ -655,7 +705,7 @@ export function GateScene({
               setMode("poster");
               setRestart((n) => n + 1);
             },
-            onStats: setStats,
+            onStats: reportStats,
             onRideSettled: (ride) => {
               rideAt.current = ride;
               syncProps();
@@ -696,7 +746,7 @@ export function GateScene({
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang, initialView, cutTo, placed]);
+  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang, initialView, cutTo, placed, reportStats]);
 
   // A fresh frame once the canvas is shown; without the scene nothing may hold the page.
   useEffect(() => {
@@ -736,8 +786,8 @@ export function GateScene({
         ref={stage}
         className="scene-stage sticky top-0 h-lvh overflow-hidden bg-bark"
         data-cut={cut ? "" : undefined}
-        onPointerMove={inside ? point : undefined}
-        onPointerLeave={inside ? unpoint : undefined}
+        onPointerMove={point}
+        onPointerLeave={unpoint}
       >
         {children}
         <canvas
@@ -747,9 +797,10 @@ export function GateScene({
           data-gate-canvas={mode}
           className={`absolute inset-0 size-full ${canvasShown ? "" : "invisible"}`}
         />
+        <div ref={squareLayer} className="absolute inset-0 transition-opacity duration-150 data-[away]:pointer-events-none data-[away]:opacity-0">
         <div
-          inert={away || !!seek}
-          className={`absolute inset-0 ${cut ? "" : "transition-opacity duration-150"} ${!away && !seek && (htmlSquare || mode === "webgl") ? "opacity-100" : "pointer-events-none opacity-0"}`}
+          inert={!!seek}
+          className={`absolute inset-0 ${cut ? "" : "transition-opacity duration-150"} ${!seek && (htmlSquare || mode === "webgl") ? "opacity-100" : "pointer-events-none opacity-0"}`}
         >
           <SquareOverlay
             ref={overlay}
@@ -765,8 +816,9 @@ export function GateScene({
             onEnterRoom={enterRoom}
           />
         </div>
+        </div>
         {inside && (
-          <div className="absolute inset-0">
+          <div ref={roomLayer} className="absolute inset-0 transition-opacity duration-150">
             <h1 className="sr-only">{square.rooms[inside].title}</h1>
             <button type="button" onClick={leaveRoom} className="room-back transition-opacity duration-300 starting:opacity-0">
               <Icon name="arrow-left" className="drop-shadow-hug" />

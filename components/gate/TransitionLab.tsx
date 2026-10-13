@@ -1,13 +1,14 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
-import { type DoorParams, PEAK, cutTime, defaultDoor } from "@/lib/door-rig";
+import { type DoorParams, cutTime, defaultDoor } from "@/lib/door-rig";
+import { ROOM_IDS, type RoomId } from "@/lib/rooms";
 import { placePath } from "@/lib/routes";
 import { type GateDebugState, GateScene, type SquareCopy } from "./GateScene";
 import type { DoorSeek } from "./renderer/engine";
 
 interface Control {
-  key: Exclude<keyof DoorParams, "cutAt">;
+  key: keyof DoorParams;
   label: string;
   min: number;
   max: number;
@@ -17,8 +18,12 @@ interface Control {
 const controls: Control[] = [
   { key: "duration", label: "Length (s)", min: 0.4, max: 2, step: 0.05 },
   { key: "zCut", label: "Square zoom at the cut", min: 1.2, max: 4, step: 0.05 },
-  { key: "blur", label: "Blur at top speed (px)", min: 0, max: 40, step: 0.5 },
+  { key: "blur", label: "Blur at top speed (px)", min: 0, max: 100, step: 1 },
   { key: "blurPower", label: "Blur exponent", min: 1, max: 4, step: 0.1 },
+  { key: "blurCentre", label: "Blur in the middle (share)", min: 0, max: 1, step: 0.05 },
+  { key: "cutAt", label: "Cut (share of the move)", min: 0.2, max: 0.7, step: 0.001 },
+  { key: "rise", label: "Speed-up exponent", min: 0.5, max: 4, step: 0.05 },
+  { key: "fall", label: "Slow-down exponent", min: 0.5, max: 4, step: 0.05 },
   { key: "roomFrom", label: "Room zoom at the cut", min: 0.98, max: 1.04, step: 0.001 },
   { key: "leafRate", label: "Leaves vs room", min: 1, max: 2.5, step: 0.05 },
   { key: "exposure", label: "Exposure match (s)", min: 0, max: 0.2, step: 0.01 },
@@ -35,15 +40,16 @@ const percentile = (xs: number[], p: number) => {
 
 declare global {
   interface Window {
-    /** Development only: hold the café move at a moment (ms), or let it go (null). */
-    holdDoor?: (at: { leg: 1 | -1; ms: number } | null) => void;
+    /** Development only: hold the move into a building at a moment (ms), or let it go (null). */
+    holdDoor?: (at: { room?: RoomId; leg: 1 | -1; ms: number } | null) => void;
   }
 }
 
-/** Development rig for the move between the square and the café: a timeline to scrub, every tunable on a slider. */
+/** Development rig for the move between the square and a building: a timeline to scrub, every tunable on a slider. */
 export function TransitionLab({ children, square }: { children: ReactNode; square: SquareCopy }) {
   const [door, setDoor] = useState<DoorParams>(defaultDoor);
   const [leg, setLeg] = useState<1 | -1>(1);
+  const [room, setRoom] = useState<RoomId>("cafe");
   const [ms, setMs] = useState(0);
   const [held, setHeld] = useState(false);
   const [state, setState] = useState<GateDebugState | null>(null);
@@ -51,12 +57,13 @@ export function TransitionLab({ children, square }: { children: ReactNode; squar
   const onDebug = useCallback((next: GateDebugState) => setState(next), []);
   const total = door.duration * 1000;
 
-  const seek = useMemo<DoorSeek | null>(() => (held ? { room: "cafe", leg, ms: Math.min(ms, total) } : null), [held, leg, ms, total]);
+  const seek = useMemo<DoorSeek | null>(() => (held ? { room, leg, ms: Math.min(ms, total) } : null), [held, room, leg, ms, total]);
 
   useEffect(() => {
     window.holdDoor = (at) => {
       if (!at) return setHeld(false);
       setLeg(at.leg);
+      setRoom(at.room ?? "cafe");
       setMs(at.ms);
       setHeld(true);
     };
@@ -89,6 +96,14 @@ export function TransitionLab({ children, square }: { children: ReactNode; squar
           <span>Hold at a moment</span>
         </label>
         <div className="mb-2 flex gap-3">
+          {ROOM_IDS.map((id) => (
+            <label key={id} className="flex items-center gap-1">
+              <input type="radio" name="room" checked={room === id} onChange={() => setRoom(id)} className="accent-pumpkin" />
+              <span>{square.t.arms[id]}</span>
+            </label>
+          ))}
+        </div>
+        <div className="mb-2 flex gap-3">
           {([1, -1] as const).map((value) => (
             <label key={value} className="flex items-center gap-1">
               <input type="radio" name="leg" checked={leg === value} onChange={() => setLeg(value)} className="accent-pumpkin" />
@@ -102,21 +117,6 @@ export function TransitionLab({ children, square }: { children: ReactNode; squar
             <span className="tabular-nums">{Math.min(ms, total).toFixed(0)} ms</span>
           </span>
           <input type="range" min={0} max={total} step={1} value={Math.min(ms, total)} onChange={(e) => setMs(Number(e.target.value))} className="w-full accent-pumpkin" />
-        </label>
-        <label className="mb-2 block">
-          <span className="flex justify-between">
-            <span>Cut (share of the move)</span>
-            <span className="tabular-nums">{format(door.cutAt ?? PEAK.t)}</span>
-          </span>
-          <input
-            type="range"
-            min={0.2}
-            max={0.7}
-            step={0.001}
-            value={door.cutAt ?? PEAK.t}
-            onChange={(e) => setDoor((d) => ({ ...d, cutAt: Number(e.target.value) }))}
-            className="w-full accent-pumpkin"
-          />
         </label>
         {controls.map(({ key, label, min, max, step }) => (
           <label key={key} className="mb-2 block">

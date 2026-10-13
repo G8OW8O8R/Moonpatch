@@ -1,0 +1,150 @@
+{
+ "cafe-moon": {
+  "plate": "cafe.jpg",
+  "x": 1252,
+  "y": 26,
+  "w": 75,
+  "h": 82
+ },
+ "barn-moon": {
+  "plate": "barn.jpg",
+  "x": 492,
+  "y": 131,
+  "w": 192,
+  "h": 176
+ },
+ "haunt-moon": {
+  "plate": "haunt.jpg",
+  "x": 358,
+  "y": 237,
+  "w": 285,
+  "h": 256
+ },
+ "haunt-eyes-reaper-left": {
+  "plate": "haunt.jpg",
+  "x": 818,
+  "y": 592,
+  "w": 83,
+  "h": 89
+ },
+ "haunt-eyes-werewolf": {
+  "plate": "haunt.jpg",
+  "x": 1231,
+  "y": 489,
+  "w": 124,
+  "h": 142
+ },
+ "haunt-eyes-skeleton": {
+  "plate": "haunt.jpg",
+  "x": 1625,
+  "y": 408,
+  "w": 84,
+  "h": 68
+ },
+ "haunt-eyes-reaper-right": {
+  "plate": "haunt.jpg",
+  "x": 1913,
+  "y": 451,
+  "w": 142,
+  "h": 112
+ },
+ "barn-candle-01": {
+  "plate": "barn.jpg",
+  "x": 1134,
+  "y": 618,
+  "w": 121,
+  "h": 181,
+  "flame": [
+   1210,
+   710
+  ]
+ },
+ "barn-candle-02": {
+  "plate": "barn.jpg",
+  "x": 1209,
+  "y": 618,
+  "w": 93,
+  "h": 198,
+  "flame": [
+   1245,
+   732
+  ]
+ },
+ "barn-candle-03": {
+  "plate": "barn.jpg",
+  "x": 1286,
+  "y": 618,
+  "w": 100,
+  "h": 188,
+  "flame": [
+   1342,
+   732
+  ]
+ },
+ "barn-candle-04": {
+  "plate": "barn.jpg",
+  "x": 1351,
+  "y": 618,
+  "w": 144,
+  "h": 176,
+  "flame": [
+   1383,
+   750
+  ]
+ },
+ "barn-candle-05": {
+  "plate": "barn.jpg",
+  "x": 1134,
+  "y": 793,
+  "w": 178,
+  "h": 174,
+  "flame": [
+   1254,
+   878
+  ]
+ },
+ "barn-candle-06": {
+  "plate": "barn.jpg",
+  "x": 1289,
+  "y": 788,
+  "w": 114,
+  "h": 176,
+  "flame": [
+   1347,
+   856
+  ]
+ },
+ "barn-candle-07": {
+  "plate": "barn.jpg",
+  "x": 1330,
+  "y": 770,
+  "w": 64,
+  "h": 126,
+  "flame": [
+   1371,
+   821
+  ]
+ },
+ "barn-candle-08": {
+  "plate": "barn.jpg",
+  "x": 1371,
+  "y": 771,
+  "w": 44,
+  "h": 140,
+  "flame": [
+   1390,
+   817
+  ]
+ },
+ "barn-candle-09": {
+  "plate": "barn.jpg",
+  "x": 1385,
+  "y": 722,
+  "w": 74,
+  "h": 239,
+  "flame": [
+   1413,
+   824
+  ]
+ }
+}

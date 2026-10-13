@@ -9,8 +9,8 @@
  * move can be stopped and turned back anywhere, through the cut as well, and
  * it retraces the very same frames.
  */
-import { type PlateWindow, bezierEasing } from "./gate-rig";
-import { type CubicBezier, duration, ease } from "./motion-tokens";
+import type { PlateWindow } from "./gate-rig";
+import { duration } from "./motion-tokens";
 import { DOORS, ROOM_REST_ZOOM, type Size, roomBox } from "./plate-box";
 import type { RoomId } from "./rooms";
 import { type Shift, type Vec2, onScreen } from "./square-rig";
@@ -24,8 +24,14 @@ export interface DoorParams {
   blur: number;
   /** Blur grows with the speed to this power. */
   blurPower: number;
-  /** Share of the move at which the cut falls; null puts it on the camera's top speed. */
-  cutAt: number | null;
+  /** Share of that blur every point of the screen gets at least, the still middle of a zoom too. */
+  blurCentre: number;
+  /** Share of the move at which the camera is fastest, and the cut falls. */
+  cutAt: number;
+  /** The speed builds up as (t / cut)^rise: lower starts sooner. */
+  rise: number;
+  /** After the cut it falls away as (1 - s)^fall: lower brakes longer. */
+  fall: number;
   /** Magnification of the room at the cut (it rests at ROOM_REST_ZOOM). */
   roomFrom: number;
   /** How much faster than the room the door leaves slide past. */
@@ -39,9 +45,13 @@ export interface DoorParams {
 export const defaultDoor: Readonly<DoorParams> = {
   duration: duration.scene,
   zCut: 2.6,
-  blur: 16,
+  blur: 48,
   blurPower: 2,
-  cutAt: null,
+  blurCentre: 0.4,
+  // 382 ms of 900.
+  cutAt: 0.4244,
+  rise: 1.3,
+  fall: 2,
   roomFrom: 1,
   leafRate: 1.6,
   exposure: 0.08,
@@ -50,39 +60,37 @@ export const defaultDoor: Readonly<DoorParams> = {
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
-const CURVE: CubicBezier = ease.camera;
-const curve = bezierEasing(CURVE);
+/**
+ * The camera's speed over the move: it builds from rest to its top at the
+ * cut, then falls away to rest again. Area under it, so progress ends on 1.
+ */
+const area = ({ cutAt: c, rise, fall }: DoorParams) => c / (rise + 1) + (1 - c) / (fall + 1);
 
-/** Slope of the camera curve (progress per share of time). */
-function slope(t: number): number {
-  const h = 1e-4;
-  const a = Math.max(0, t - h);
-  const b = Math.min(1, t + h);
-  return (curve(b) - curve(a)) / (b - a);
+/** Camera progress (0–1) at a share of the move's time. */
+export function cameraProgress(t: number, params: DoorParams = defaultDoor): number {
+  const { cutAt: c, rise, fall } = params;
+  const x = clamp01(t);
+  if (x < c) return ((c / (rise + 1)) * (x / c) ** (rise + 1)) / area(params);
+  const s = (x - c) / (1 - c);
+  return (c / (rise + 1) + ((1 - c) / (fall + 1)) * (1 - (1 - s) ** (fall + 1))) / area(params);
 }
 
-/** Where the camera curve is fastest: its share of time and its slope there. */
-export const PEAK: Readonly<{ t: number; slope: number }> = (() => {
-  let t = 0;
-  let best = 0;
-  // Coarse, then fine: the curve has a single, smooth peak.
-  for (let i = 0; i <= 1000; i++) {
-    const s = slope(i / 1000);
-    if (s > best) [best, t] = [s, i / 1000];
-  }
-  for (let i = -100; i <= 100; i++) {
-    const at = t + i / 1e5;
-    const s = slope(at);
-    if (s > best) [best, t] = [s, at];
-  }
-  return { t, slope: best };
-})();
+/** Its slope (progress per share of time). */
+export function cameraSlope(t: number, params: DoorParams = defaultDoor): number {
+  const { cutAt: c, rise, fall } = params;
+  const x = clamp01(t);
+  if (x < c) return (x / c) ** rise / area(params);
+  return (1 - (x - c) / (1 - c)) ** fall / area(params);
+}
+
+/** The slope at the top, at the cut. */
+const topSlope = (params: DoorParams) => 1 / area(params);
 
 /** Share of the move at which the cut falls. */
-export const cutTime = (params: DoorParams = defaultDoor) => params.cutAt ?? PEAK.t;
+export const cutTime = (params: DoorParams = defaultDoor) => params.cutAt;
 
 /** Camera progress at the cut. */
-export const cutProgress = (params: DoorParams = defaultDoor) => curve(cutTime(params));
+export const cutProgress = (params: DoorParams = defaultDoor) => cameraProgress(params.cutAt, params);
 
 /** +1 goes into the building, -1 comes out onto the square. */
 export type Leg = 1 | -1;
@@ -112,8 +120,8 @@ export interface Head {
 /** The head a leg played from its start has reached after `seconds`. */
 export function legAt(leg: Leg, seconds: number, params: DoorParams = defaultDoor): Head {
   const t = clamp01(seconds / params.duration);
-  const j = journey(leg, curve(t), params);
-  const v = t >= 1 ? 0 : (leg * slope(t) * journeyRate(leg, j, params)) / params.duration;
+  const j = journey(leg, cameraProgress(t, params), params);
+  const v = t >= 1 ? 0 : (leg * cameraSlope(t, params) * journeyRate(leg, j, params)) / params.duration;
   return { j, v };
 }
 
@@ -123,7 +131,7 @@ export function legAt(leg: Leg, seconds: number, params: DoorParams = defaultDoo
  * speed never jumps where a move is turned around.
  */
 export function paceOf(head: Head, leg: Leg, params: DoorParams = defaultDoor): number {
-  const top = (PEAK.slope * journeyRate(leg, head.j, params)) / params.duration;
+  const top = (topSlope(params) * journeyRate(leg, head.j, params)) / params.duration;
   return clamp01(Math.abs(head.v) / top);
 }
 
@@ -201,7 +209,7 @@ export function turnAround(move: Move, now: number, params: DoorParams = default
   const { head, leg } = moveAt(move, now, params);
   const back = -move.leg as Leg;
   const end = endOf(back);
-  const top = (PEAK.slope * Math.max(0.5 / cutProgress(params), 0.5 / (1 - cutProgress(params)))) / params.duration;
+  const top = (topSlope(params) * Math.max(0.5 / cutProgress(params), 0.5 / (1 - cutProgress(params)))) / params.duration;
   const reach = Math.abs(head.j - end);
   const speed = Math.min(top, Math.max(Math.abs(head.v), (2 * reach) / params.duration, 1e-3));
   const draft = { kind: "turn" as const, from: leg, leg: back, start: now, head, speed, stop: 0 };

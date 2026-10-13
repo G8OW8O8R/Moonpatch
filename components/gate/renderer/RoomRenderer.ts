@@ -187,10 +187,13 @@ export class RoomRenderer {
     gl.disable(gl.BLEND);
   }
 
-  /** The clean plate's texture, whose lowest mip is the room's mean light. */
+  /**
+   * The room as it is seen, for its mean light: its own file (the leaves on it), or until that is
+   * here the clean plate, which is a little off where it carries the room on under the leaves.
+   */
   meanSource(room: RoomId): { texture: WebGLTexture; width: number; height: number } | null {
     const textures = this.rooms.get(room);
-    return textures ? { texture: textures.clean, width: PLATE.width, height: PLATE.height } : null;
+    return textures ? { texture: textures.plate ?? textures.clean, width: PLATE.width, height: PLATE.height } : null;
   }
 
   dispose() {

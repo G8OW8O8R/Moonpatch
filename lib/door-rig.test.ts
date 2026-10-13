@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  PEAK,
   blurOf,
+  cameraSlope,
   cameraField,
   cutProgress,
   cutTime,
@@ -26,24 +26,37 @@ const desktop = { width: 1536, height: 864 };
 const base = windowAt(squareFrame(desktop, { dusk: 1, wander: 1 }));
 const ms = (n: number) => n / 1000;
 
-describe("the camera curve", () => {
-  it("is fastest 42.4 % of the way, where the cut falls: 382 ms of 900", () => {
-    expect(PEAK.t).toBeCloseTo(0.424, 2);
-    expect(cutTime() * defaultDoor.duration * 1000).toBeCloseTo(382, -1);
-    expect(cutProgress()).toBeCloseTo(0.461, 2);
+describe("the camera's speed", () => {
+  it("is fastest where the cut falls: 382 ms of 900", () => {
+    expect(cutTime() * defaultDoor.duration * 1000).toBeCloseTo(382, 0);
+    let best = 0;
+    let at = 0;
+    for (let t = 0; t <= 1; t += 0.001) if (cameraSlope(t) > best) [best, at] = [cameraSlope(t), t];
+    expect(at).toBeCloseTo(cutTime(), 2);
+  });
+
+  it("starts and ends at rest, and the progress it adds up to ends on 1", () => {
+    expect(cameraSlope(0)).toBe(0);
+    expect(cameraSlope(1)).toBe(0);
+    expect(legAt(1, 0.9).j).toBe(1);
+    expect(cutProgress()).toBeGreaterThan(0.4);
+    expect(cutProgress()).toBeLessThan(0.6);
   });
 });
 
 describe("into a building", () => {
-  it("pushes in on the square up to the cut, then the room settles from 1.00 to 1.04", () => {
+  it("is already moving 90 ms after the click, and pushes in to 2.6 at the cut", () => {
     const at = (t: number) => legAt(1, ms(t)).j;
     expect(squareZoom(at(0))).toBe(1);
-    expect(squareZoom(at(200))).toBeCloseTo(1.11, 2);
-    expect(squareZoom(at(300))).toBeCloseTo(1.41, 2);
-    expect(squareZoom(at(350))).toBeCloseTo(1.88, 1);
-    expect(roomZoom(at(400))).toBeCloseTo(1.007, 3);
-    expect(roomZoom(at(450))).toBeCloseTo(1.02, 3);
-    expect(roomZoom(at(600))).toBeCloseTo(1.034, 3);
+    expect(squareZoom(at(90))).toBeGreaterThan(1.03);
+    expect(squareZoom(at(381.9))).toBeCloseTo(2.6, 1);
+  });
+
+  it("lets the room settle from 1.00 to 1.04 over the rest of the move, not in a frame or two", () => {
+    const at = (t: number) => legAt(1, ms(t)).j;
+    expect(roomZoom(at(382))).toBeCloseTo(1, 3);
+    expect(roomZoom(at(450))).toBeLessThan(1.02);
+    expect(roomZoom(at(550))).toBeLessThan(1.035);
     expect(roomZoom(at(900))).toBe(ROOM_REST_ZOOM);
   });
 
@@ -56,12 +69,15 @@ describe("into a building", () => {
     }
   });
 
-  it("blurs most at the cut, 16 px, and not at all at rest", () => {
+  it("blurs most at the cut, and lets the blur go over about 250 ms after it", () => {
     const blurAt = (t: number) => blurOf(paceOf(legAt(1, ms(t)), 1));
     expect(blurAt(0)).toBeCloseTo(0, 3);
-    expect(blurAt(382)).toBeCloseTo(16, 0);
-    expect(blurAt(350)).toBeCloseTo(8.5, 0);
-    expect(blurAt(450)).toBeCloseTo(3.4, 0);
+    expect(blurAt(382)).toBeCloseTo(defaultDoor.blur, 0);
+    // A frame either side of the cut is still smeared hard.
+    expect(blurAt(366)).toBeGreaterThan(0.8 * defaultDoor.blur);
+    expect(blurAt(398)).toBeGreaterThan(0.8 * defaultDoor.blur);
+    expect(blurAt(500)).toBeGreaterThan(0.25 * defaultDoor.blur);
+    expect(blurAt(632)).toBeLessThan(0.1 * defaultDoor.blur);
     expect(blurAt(900)).toBe(0);
   });
 
@@ -91,11 +107,11 @@ describe("out of a building", () => {
   it("is the way in turned around, with the cut again at 382 ms", () => {
     const at = (t: number) => legAt(-1, ms(t)).j;
     expect(roomZoom(at(0))).toBe(ROOM_REST_ZOOM);
+    expect(roomZoom(at(90))).toBeLessThan(1.039);
     expect(at(381)).toBeGreaterThan(0.5);
     expect(at(383)).toBeLessThan(0.5);
-    expect(squareZoom(at(400))).toBeCloseTo(2.2, 1);
-    expect(squareZoom(at(450))).toBeCloseTo(1.61, 2);
-    expect(squareZoom(at(600))).toBeCloseTo(1.14, 2);
+    expect(squareZoom(at(383))).toBeCloseTo(2.6, 1);
+    expect(squareZoom(at(632))).toBeLessThan(1.2);
     expect(at(900)).toBe(0);
   });
 });
