@@ -60,4 +60,39 @@ describe("followLimited", () => {
     }
     expect(state.value).toBeLessThan(0.35);
   });
+
+  it("is on the target within 0.3 s of it stopping, at any frame rate and pace up to the limit", () => {
+    for (const fps of [30, 60, 120]) {
+      for (const limit of [0.6, 0.9, 2.25]) {
+        for (const pace of [0.2, 0.5, 1]) {
+          const dt = 1 / fps;
+          let state: SpringState = { value: 0, velocity: 0 };
+          let target = 0;
+          for (let t = 0; t < 0.5; t += dt) {
+            target += limit * pace * dt;
+            state = followLimited(state, target, dt, limit);
+          }
+          let waited = 0;
+          while (state.value !== target && waited < 1) {
+            state = followLimited(state, target, dt, limit);
+            waited += dt;
+          }
+          expect(state).toEqual({ value: target, velocity: 0 });
+          expect(waited).toBeLessThanOrEqual(0.3);
+        }
+      }
+    }
+  });
+
+  it("lands softly, even from a flick held back by its speed limit", () => {
+    const dt = 1 / 60;
+    let state: SpringState = { value: 0, velocity: 0 };
+    let last = state;
+    while (state.value !== 0.6) {
+      last = state;
+      state = followLimited(state, 0.6, dt, 2.25);
+    }
+    // The frame before it comes to rest it is already creeping, not braking hard against the target.
+    expect(Math.abs(last.velocity)).toBeLessThan(2.25 * 0.1);
+  });
 });

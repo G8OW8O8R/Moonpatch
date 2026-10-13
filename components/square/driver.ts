@@ -82,6 +82,11 @@ export class SquareDriver {
     this.wake();
   }
 
+  /** Hands out the current frame at once, in the same task (the page is being laid out around it). */
+  draw() {
+    if (!this.disposed) this.onFrame(this.snapshot());
+  }
+
   /** The current state, without waiting for a frame. */
   snapshot(now = performance.now()): SquareState {
     return {

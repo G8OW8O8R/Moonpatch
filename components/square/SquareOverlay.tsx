@@ -9,12 +9,16 @@ import type { Messages } from "@/lib/messages";
 import { PLATE, type Size, coverSizes } from "@/lib/plate-box";
 import { placePath } from "@/lib/routes";
 import { ARMS, type ArmId, PROP_TINT, type PropQuad, propsOnScreen } from "@/lib/square-props";
-import { DUSK } from "@/lib/square-rig";
+import { DUSK, gradeAt } from "@/lib/square-rig";
 import { LABEL_SIZE } from "./labels";
 
 export interface SquareOverlayHandle {
-  /** Places everything for this frame. `onCanvas`: the WebGL scene draws the square, panning on portrait screens. */
-  update(state: SquareState, css: Size, onCanvas: boolean): void;
+  /**
+   * Places everything for this frame. `onCanvas`: the WebGL scene draws the
+   * square. `pan`: the camera pans on portrait screens, as the WebGL scene's
+   * does (also while this layer stands in for it, before it is ready).
+   */
+  update(state: SquareState, css: Size, onCanvas: boolean, pan: boolean): void;
 }
 
 export interface SquareOverlayProps {
@@ -84,8 +88,8 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onOpenBo
   useImperativeHandle(
     ref,
     () => ({
-      update(state, css, onCanvas) {
-        const { props: onScreen, shadows: contact, plate } = propsOnScreen(css, state, { pan: onCanvas });
+      update(state, css, onCanvas, pan) {
+        const { props: onScreen, shadows: contact, plate } = propsOnScreen(css, state, { pan });
         for (const arm of ARMS) {
           const id = `arm-${arm.id}` as PropQuad["id"];
           place(arms.current[arm.id] ?? null, onScreen[id].rect, state.arms[arm.id], onScreen[id].pivot);
@@ -117,6 +121,8 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onOpenBo
         if (!el) return;
         if (next.shown !== flags.current.shown && props.current) props.current.inert = !next.shown;
         el.style.setProperty("--props", String(onCanvas ? 1 : state.props));
+        // The scene's own golden-to-dusk grade, for a start straight onto the square (no crossfade to wait for).
+        el.style.setProperty("--grade", gradeAt(state.dusk).toFixed(3));
         for (const key of Object.keys(next) as (keyof typeof next)[]) {
           if (next[key] === flags.current[key]) continue;
           if (next[key]) el.dataset[key] = "";

@@ -41,13 +41,17 @@ export function isSettled(state: SpringState, target: number): boolean {
   return Math.abs(state.value - target) < REST_DISTANCE && Math.abs(state.velocity) < REST_SPEED;
 }
 
+const FOLLOW_OMEGA = 30;
+const FOLLOW_REST = { distance: 1e-3, speed: 5e-2 } as const;
+
 /**
  * Follows a target on a critically damped spring with a speed limit, never
  * passing it in either direction: a flick of the wheel plays a move out
  * instead of skipping it, and nothing overshoots. `limit` is in units per
- * second, `omega` sets how tightly it trails.
+ * second, `omega` sets how tightly it trails: tight enough that, once the
+ * target stops, the follower is on it within 0.3 s.
  */
-export function followLimited(state: SpringState, target: number, dt: number, limit: number, omega = 14): SpringState {
+export function followLimited(state: SpringState, target: number, dt: number, limit: number, omega = FOLLOW_OMEGA): SpringState {
   if (!(dt > 0)) return state;
   let { value, velocity } = state;
   const steps = Math.max(1, Math.ceil(dt / MAX_STEP));
@@ -62,6 +66,7 @@ export function followLimited(state: SpringState, target: number, dt: number, li
       velocity = 0;
     }
   }
-  if (Math.abs(target - value) < 1e-4 && Math.abs(velocity) < 1e-3) return { value: target, velocity: 0 };
+  // The last thousandth is too small to see; crawling through it would only read as lag.
+  if (Math.abs(target - value) < FOLLOW_REST.distance && Math.abs(velocity) < FOLLOW_REST.speed) return { value: target, velocity: 0 };
   return { value, velocity };
 }

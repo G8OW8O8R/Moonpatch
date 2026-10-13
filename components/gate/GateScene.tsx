@@ -2,13 +2,14 @@
 
 import "lenis/dist/lenis.css";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type RigParams, defaultRig } from "@/lib/gate-rig";
 import type { Locale } from "@/lib/i18n";
 import type { Messages } from "@/lib/messages";
 import { placeAt, placePath } from "@/lib/routes";
 import { type ArmId, OPENED_BOARD, OPENED_BOARD_AVIF } from "@/lib/square-props";
 import { DUSK, type Track, defaultTrack, trackAt, trackEnd, trackLength } from "@/lib/square-rig";
+import { SPOT_KEY, readSpot, spotToKeep, startAt, writeSpot } from "@/lib/square-spot";
 import type { VisitCopy } from "@/lib/visit";
 import { publishLenis } from "@/components/ui/lenis-channel";
 import { SquareDriver } from "@/components/square/driver";
@@ -69,6 +70,26 @@ const debugLayer = (): { debugLayer?: "gate" | "plate" } => {
 
 const prefersReduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** Set once a scene has left the page for another place on the farm: coming back to one is a return. */
+let sceneLeft = false;
+
+/** A way back (a move inside the site, the browser's back or forward), rather than a reload or a fresh visit? */
+const isReturning = () => {
+  const entry = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+  if (entry?.type === "back_forward") return true;
+  // A page reached by a move inside the site is not the document's own address.
+  const documentPath = entry ? new URL(entry.name).pathname : window.location.pathname;
+  return sceneLeft || documentPath !== window.location.pathname;
+};
+
+const storedSpot = () => {
+  try {
+    return readSpot(window.sessionStorage.getItem(SPOT_KEY));
+  } catch {
+    return null;
+  }
+};
+
 /**
  * The farm's front page in one scroll: the gate opens, the ride goes through
  * it onto the square, dusk falls over the square, and a last stretch pushes
@@ -93,6 +114,17 @@ export function GateScene({
   const controller = useRef<GateController | null>(null);
   const driver = useRef<SquareDriver | null>(null);
   const progress = useRef(0);
+  /** Scroll into the section, in viewport heights: the spot to come back to. */
+  const scrolled = useRef(0);
+  /** Where this visit starts (decided once, before the first paint). */
+  const startedAt = useRef<number | null>(null);
+  /**
+   * The page started on the square: it is simply there, a cut, with no fade
+   * over the gate poster beneath. Lasts until the visitor first scrolls.
+   */
+  const [cut, setCut] = useState(false);
+  /** The scene has its first frame; it is shown once it can draw the square, if that is where the page is. */
+  const engineReady = useRef(false);
   const paramsRef = useRef(params);
   const trackRef = useRef(track);
   const [mode, setMode] = useState<Mode>("poster");
@@ -172,13 +204,22 @@ export function GateScene({
     }
   }, []);
 
+  const showCanvas = useCallback(() => {
+    if (!engineReady.current || modeRef.current === "webgl") return;
+    // On the square, the canvas waits for the square's own layers; until then the plain one stands.
+    if (rideWanted.current === 1 && !squareReady.current) return;
+    setMode("webgl");
+    setReason("");
+  }, []);
+
   const measure = useCallback(() => {
     const el = section.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     // The pinned stage is a fixed 100lvh, unlike innerHeight, which jumps as a phone's toolbar hides.
     const unit = stage.current?.clientHeight ?? window.innerHeight;
-    const at = trackAt(-rect.top / unit, trackRef.current);
+    scrolled.current = -rect.top / unit;
+    const at = trackAt(scrolled.current, trackRef.current);
     progress.current = at.gate;
     controller.current?.setProgress(at.gate);
     driver.current?.follow(at.dusk, at.wander);
@@ -188,12 +229,15 @@ export function GateScene({
     if (wanted !== rideWanted.current) {
       rideWanted.current = wanted;
       syncProps();
+      showCanvas();
     }
     if (wanted === 1 || driver.current?.atStart !== false) sendRide(wanted);
     setPastHalf(at.gate >= 0.5);
+    // The cut is the first frame only: from the first move on, the scene moves as it always does.
+    if (startedAt.current !== null && Math.abs(scrolled.current - startedAt.current) > 0.01) setCut(false);
     if (at.gate > 0) setMoved(true);
     if (onDebug) setDebugProgress(at.gate);
-  }, [onDebug, sendRide, syncProps]);
+  }, [onDebug, sendRide, syncProps, showCanvas]);
 
   useEffect(() => {
     paramsRef.current = params;
@@ -210,14 +254,16 @@ export function GateScene({
   }, [onDebug, mode, reason, debugProgress, stats]);
 
   // The square's own motion, on this thread: every frame goes to the canvas and to the page's layer.
-  useEffect(() => {
+  // Laid out before the first paint, so the start below can already place it.
+  useLayoutEffect(() => {
     const d = new SquareDriver({
       reduced: prefersReduced(),
       onFrame: (state: SquareState) => {
         const webgl = modeRef.current === "webgl";
         if (webgl) controller.current?.setSquare(state);
         const el = stage.current;
-        if (el) overlay.current?.update(state, { width: el.clientWidth, height: el.clientHeight }, webgl);
+        // Before the scene is ready this layer stands in for it, framed as it will be; the fallback holds still.
+        if (el) overlay.current?.update(state, { width: el.clientWidth, height: el.clientHeight }, webgl, modeRef.current !== "fallback");
         // Paper type once the sky has darkened, and over the opened board.
         const header = state.dusk >= DUSK.header || state.visit > 0 ? "paper" : "ink";
         if (section.current && section.current.dataset.header !== header) section.current.dataset.header = header;
@@ -259,19 +305,57 @@ export function GateScene({
     };
   }, [measure]);
 
-  // Arriving on the board's own address, or on the square's (#square): the scene starts where it ends.
-  useEffect(() => {
-    if (initialView !== "visit" && window.location.hash !== "#square") return;
+  // Where the page starts is decided here, never by the browser: a reload or a fresh visit starts on
+  // the closed gate (the poster's own frame); the way back from a building lands on the spot the
+  // visitor left, the ride over; the board's address and #square start where the square comes to rest.
+  // Before the first paint, so not even one frame of the gate shows on the way back.
+  useLayoutEffect(() => {
+    try {
+      window.history.scrollRestoration = "manual";
+    } catch {
+      // Without it the browser may restore a spot of its own; the scroll below still wins.
+    }
+    if (startedAt.current === null) {
+      const square = window.location.hash === "#square";
+      startedAt.current = startAt({ board: initialView === "visit", square, returning: isReturning(), spot: storedSpot() }, trackRef.current);
+      // #square only says where to start: a reload of the address is a fresh visit.
+      if (square) window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
+    const at = startedAt.current;
     const el = section.current;
-    const unit = stage.current?.clientHeight ?? window.innerHeight;
     if (!el) return;
+    const unit = stage.current?.clientHeight ?? window.innerHeight;
     const top = el.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top: top + trackEnd(trackRef.current) * unit, behavior: "instant" });
+    window.scrollTo({ top: at > 0 ? top + at * unit : 0, behavior: "instant" });
     measure();
-    driver.current?.follow(1, 1, true);
+    if (at === 0) return;
+    const land = trackAt(at, trackRef.current);
     rideWanted.current = 1;
     syncProps(true);
+    driver.current?.follow(land.dusk, land.wander, true);
+    // The header and the square's layer are set in this very commit: no frame shows the server's gate state.
+    driver.current?.draw();
+    setCut(true);
   }, [initialView, measure, syncProps]);
+
+  // The spot on the square is kept for the way back, as the scene leaves the page or the tab.
+  useEffect(() => {
+    const remember = () => {
+      try {
+        const spot = spotToKeep(scrolled.current, trackRef.current);
+        if (spot === null) window.sessionStorage.removeItem(SPOT_KEY);
+        else window.sessionStorage.setItem(SPOT_KEY, writeSpot(spot));
+      } catch {
+        // No storage: the way back starts afresh.
+      }
+    };
+    window.addEventListener("pagehide", remember);
+    return () => {
+      window.removeEventListener("pagehide", remember);
+      sceneLeft = true;
+      remember();
+    };
+  }, []);
 
   // The board opens with its address: the camera flies onto it, the page holds still beneath it.
   useEffect(() => {
@@ -343,6 +427,8 @@ export function GateScene({
       sync();
     });
     const resize = new ResizeObserver(() => {
+      // A stage on its way out of the page measures nothing: there is no frame to fit to it.
+      if (!stageEl.isConnected || !stageEl.clientWidth || !stageEl.clientHeight) return;
       controller.current?.resize({ width: stageEl.clientWidth, height: stageEl.clientHeight });
     });
 
@@ -351,6 +437,7 @@ export function GateScene({
       void import("./renderer/start").then(({ startGate }) => {
         if (cancelled) return;
         squareReady.current = false;
+        engineReady.current = false;
         controller.current = startGate(
           canvasEl,
           poster,
@@ -363,15 +450,17 @@ export function GateScene({
           },
           {
             onReady: () => {
-              setMode("webgl");
-              setReason("");
+              engineReady.current = true;
+              showCanvas();
             },
             onFail: (why) => {
+              engineReady.current = false;
               controller.current = null;
               setMode("fallback");
               setReason(why);
             },
             onPlateChange: () => {
+              engineReady.current = false;
               controller.current?.dispose();
               controller.current = null;
               setMode("poster");
@@ -386,6 +475,7 @@ export function GateScene({
             onSquareReady: () => {
               squareReady.current = true;
               syncProps();
+              showCanvas();
             },
           },
         );
@@ -410,7 +500,7 @@ export function GateScene({
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [restart, release, syncProps, square.t.arms]);
+  }, [restart, release, syncProps, showCanvas, square.t.arms]);
 
   // A fresh frame once the canvas is shown; without the scene nothing may hold the page.
   useEffect(() => {
@@ -446,7 +536,7 @@ export function GateScene({
       className="relative"
       style={{ height: `${trackLength(track) * 100}lvh` }}
     >
-      <div ref={stage} className="scene-stage sticky top-0 h-lvh overflow-hidden bg-bark">
+      <div ref={stage} className="scene-stage sticky top-0 h-lvh overflow-hidden bg-bark" data-cut={cut ? "" : undefined}>
         {children}
         <canvas
           key={restart}
@@ -455,7 +545,7 @@ export function GateScene({
           data-gate-canvas={mode}
           className={`absolute inset-0 size-full ${canvasShown ? "" : "invisible"}`}
         />
-        <div className={`absolute inset-0 transition-opacity duration-150 ${htmlSquare || mode === "webgl" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+        <div className={`absolute inset-0 ${cut ? "" : "transition-opacity duration-150"} ${htmlSquare || mode === "webgl" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
           <SquareOverlay
             ref={overlay}
             lang={square.lang}

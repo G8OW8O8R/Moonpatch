@@ -246,6 +246,21 @@
     opacity: 1;
   }
 
+  /* Started on the square (the way back from a building): it is simply there, never faded in over the gate. */
+  .scene-stage[data-cut] .gate-poster {
+    visibility: hidden;
+  }
+
+  .scene-stage[data-cut] .square-overlay .square-dusk {
+    opacity: var(--grade, 0);
+    transition: none;
+  }
+
+  /* At dusk, the golden plate never shows through a dusk plate still on its way. */
+  .scene-stage[data-cut] .square-overlay[data-dusk] .square-plates img:not(.square-dusk) {
+    visibility: hidden;
+  }
+
   .square-overlay:not([data-webgl]) .square-props {
     opacity: var(--props, 0);
   }
