@@ -6,20 +6,23 @@ import type { SquareState } from "@/components/gate/renderer/SquareRenderer";
 import { Icon } from "@/components/ui/Icon";
 import type { Locale } from "@/lib/i18n";
 import type { Messages } from "@/lib/messages";
+import type { PlateWindow } from "@/lib/gate-rig";
 import { PLATE, type Size, coverSizes } from "@/lib/plate-box";
 import { PROP_LIGHT } from "@/lib/prop-light";
 import { placePath } from "@/lib/routes";
 import { ARMS, type ArmId, BOARD_WRITING, DUSK_PROP, type PropQuad, propsOnScreen } from "@/lib/square-props";
 import { DUSK, gradeAt } from "@/lib/square-rig";
-import { LABEL_SIZE, armLabelSizes } from "./labels";
+import { LABEL_SIZE, armLabelSizes, knownArmLabelSizes } from "./labels";
+import { DUSK_POSTER, GOLDEN_PLATE, plateSrcSet } from "./warm";
 
 export interface SquareOverlayHandle {
   /**
    * Places everything for this frame. `onCanvas`: the WebGL scene draws the
    * square. `pan`: the camera pans on portrait screens, as the WebGL scene's
    * does (also while this layer stands in for it, before it is ready).
+   * Returns the window onto the plate for this frame.
    */
-  update(state: SquareState, css: Size, onCanvas: boolean, pan: boolean): void;
+  update(state: SquareState, css: Size, onCanvas: boolean, pan: boolean): PlateWindow;
 }
 
 export interface SquareOverlayProps {
@@ -31,6 +34,13 @@ export interface SquareOverlayProps {
    * and loads no images at all.
    */
   paints: boolean;
+  /**
+   * The square itself is wanted: not while the board is open on its own
+   * address, where the square shows only out of focus behind it.
+   */
+  plates: boolean;
+  /** The page's first frame is the square: its plates are painted with it, not a frame later. */
+  first: boolean;
   boardOpen: boolean;
   onPointArm(arm: ArmId, pointed: boolean): void;
   onPointBoard(pointed: boolean): void;
@@ -38,23 +48,24 @@ export interface SquareOverlayProps {
   ref?: Ref<SquareOverlayHandle>;
 }
 
-const plateSet = (name: string, format: "avif" | "webp") =>
-  `/img/plates/${name}-1600.${format} 1600w, /img/plates/${name}-2576.${format} 2576w`;
-
-/** `soft`: seen only out of focus behind the open board, so the small file will do. */
-function Plate({ name, className, soft = false }: { name: "square-golden" | "square-dusk"; className: string; soft?: boolean }) {
-  const sizes = soft ? "50vw" : coverSizes(PLATE);
+/**
+ * A square plate: the golden photograph, or the square at the end of dusk
+ * as the scene draws it. `first`: shown in the page's first frame, decoded
+ * with it rather than after it.
+ */
+function Plate({ plate, className, first }: { plate: { base: string; widths: readonly number[] }; className: string; first: boolean }) {
+  const sizes = coverSizes(PLATE);
   return (
     <picture>
-      <source type="image/avif" srcSet={plateSet(name, "avif")} sizes={sizes} />
+      <source type="image/avif" srcSet={plateSrcSet(plate.base, plate.widths, "avif")} sizes={sizes} />
       <img
-        src={`/img/plates/${name}-1600.webp`}
-        srcSet={plateSet(name, "webp")}
+        src={`${plate.base}-1600.webp`}
+        srcSet={plateSrcSet(plate.base, plate.widths, "webp")}
         sizes={sizes}
         alt=""
         width={PLATE.width}
         height={PLATE.height}
-        decoding="async"
+        decoding={first ? "sync" : "async"}
         draggable={false}
         className={`absolute inset-0 size-full max-w-none select-none ${className}`}
       />
@@ -101,7 +112,9 @@ function PropImage({ id }: { id: PropQuad["id"] }) {
  * exactly over the painted props; without it they carry the props
  * themselves, over plain plates, under a still grain.
  */
-export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onPointBoard, onOpenBoard, ref }: SquareOverlayProps) {
+export function SquareOverlay({ lang, t, paints: paintsSquare, plates: squareWanted, first, boardOpen, onPointArm, onPointBoard, onOpenBoard, ref }: SquareOverlayProps) {
+  // Behind the board opened on its own address nothing of the square is drawn here: not one image is fetched for it.
+  const paints = paintsSquare && squareWanted;
   const root = useRef<HTMLDivElement>(null);
   const props = useRef<HTMLDivElement>(null);
   const plates = useRef<HTMLDivElement>(null);
@@ -111,7 +124,7 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onPointB
   const shadows = useRef<HTMLDivElement>(null);
   const flags = useRef({ shown: false, dusk: false, tagline: false, door: false });
   /** Lettering sizes for the plain-HTML arms, measured as the scene measures its own. */
-  const [labelSizes, setLabelSizes] = useState<Partial<Record<ArmId, number>>>({});
+  const [labelSizes, setLabelSizes] = useState<Partial<Record<ArmId, number>>>(() => knownArmLabelSizes(lang));
 
   useEffect(() => {
     if (!paints) return;
@@ -157,7 +170,7 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onPointB
           door: state.wander >= 0.85,
         };
         const el = root.current;
-        if (!el) return;
+        if (!el) return plate;
         if (next.shown !== flags.current.shown && props.current) props.current.inert = !next.shown;
         el.style.setProperty("--props", String(onCanvas ? 1 : state.props));
         // The scene's own golden-to-dusk grade, for a start straight onto the square (no crossfade to wait for).
@@ -168,6 +181,7 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onPointB
           else delete el.dataset[key];
         }
         flags.current = next;
+        return plate;
       },
     }),
     [],
@@ -177,9 +191,8 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onPointB
     <div ref={root} className="square-overlay absolute inset-0" data-webgl={paints ? undefined : ""}>
       {paints && (
         <div ref={plates} aria-hidden="true" className="square-plates absolute top-0 left-0 overflow-hidden">
-          {/* Behind the open board only dusk shows, and only out of focus. */}
-          {!boardOpen && <Plate name="square-golden" className="" />}
-          <Plate name="square-dusk" className="square-dusk" soft={boardOpen} />
+          <Plate plate={GOLDEN_PLATE} className="" first={first} />
+          <Plate plate={DUSK_POSTER} className="square-dusk" first={first} />
         </div>
       )}
       {paints && <div aria-hidden="true" className="square-grain absolute inset-0" />}
@@ -268,7 +281,7 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onPointB
             <Icon name="arrow-left" className="hint-arrow -rotate-90" />
           </span>
           <span className="hint-door" aria-hidden="true">
-            {t.pickDoor}
+            {t.useSignpost}
             <Icon name="arrow-left" className="hint-arrow hint-arrow-door" />
           </span>
         </p>

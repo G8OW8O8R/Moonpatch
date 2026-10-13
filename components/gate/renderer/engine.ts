@@ -6,7 +6,7 @@
  */
 import { type Follower, type RigParams, endWindow, followOpening, restWindow, settledState } from "@/lib/gate-rig";
 import type { PosterPlate, Size } from "@/lib/plate-box";
-import { type ArmId, BOARD_WRITING, type PropQuad } from "@/lib/square-props";
+import { type ArmId, BOARD_WRITING, type PropQuad, openedBoard } from "@/lib/square-props";
 import { type FrameStats, GateRenderer, type GateImages, gateLayers } from "./GateRenderer";
 import { GRAIN_FPS, GrainPass } from "./grain";
 import { type SquareImages, SquareRenderer, type SquareState } from "./SquareRenderer";
@@ -172,6 +172,11 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
   let raf = 0;
   let movedAt = -Infinity;
   let ready = false;
+  /**
+   * Square frames drawn since its layers arrived (-1: none to wait for). The page is told the square
+   * is ready only once a frame of it is on the canvas, so the canvas is never shown a frame early.
+   */
+  let squareFrames = -1;
   const frames = frameScheduler();
 
   const gl = canvas.getContext("webgl2", {
@@ -216,7 +221,15 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
       if (onSquare) squareRenderer!.render(setup.debugLayer === "plate" ? { ...square, props: 0 } : square, css, renderer.devicePixelRatio, seconds, renderer.size);
       else renderer.render({ opening: opening.value, ride }, params, riding);
       // The closed gate is the poster itself; grain comes in along the ride and stays on the square.
-      grain?.draw(onSquare ? 1 : ride * ride, seconds, renderer.size, renderer.devicePixelRatio);
+      // Over the opened board the page lays the same film itself, over its cards as well.
+      const dpr = renderer.devicePixelRatio;
+      const board = onSquare && square.visit >= 0.999 ? openedBoard(css) : null;
+      const hole = board && { x: board.x * dpr, y: board.y * dpr, w: board.w * dpr, h: board.h * dpr };
+      grain?.draw(onSquare ? 1 : ride * ride, seconds, renderer.size, dpr, hole);
+      if (onSquare && squareFrames >= 0 && ++squareFrames === 2) {
+        squareFrames = -1;
+        events.onSquareReady();
+      }
     }
 
     // Keep drawing every frame while anything moves, so motion is smooth and its pace measurable.
@@ -297,7 +310,7 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
         for (const [arm, bitmap] of pendingLabels) created.setLabel(arm, bitmap);
         pendingLabels.clear();
         squareRenderer = created;
-        events.onSquareReady();
+        squareFrames = 0;
         schedule();
       })
       // Without its dusk layers the square still stands, in golden light: never worth failing the gate over.

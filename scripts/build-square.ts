@@ -14,10 +14,15 @@
  *   lights        lossless; red = which light a pixel belongs to (0 = none),
  *                 green = the soft bloom around it.
  *   props         the signpost and the notice board from public/layers,
- *                 as WebP with alpha, at their own size; board-open is the
- *                 board in the warm light it has once opened (PROP_TINT.open
- *                 in lib/square-props) with its lantern alight, so the page
- *                 never filters it.
+ *                 as WebP with alpha, at their own size; board-open-<width>
+ *                 is the board in the warm light it has once opened
+ *                 (PROP_TINT.open in lib/square-props) with its lantern
+ *                 alight, so the page never filters it, in the widths the
+ *                 page asks for.
+ *   poster-dusk   the square at the very end of dusk, as the scene draws it
+ *                 (dusk-base, every light on, its bloom), for the page to
+ *                 stand on before the scene is ready; -soft is the part seen
+ *                 behind the opened board, dimmed and out of focus.
  *   *-dusk        each prop in the light at the very end of dusk, for the
  *                 square without WebGL: the light the scene gives it then
  *                 (lib/prop-light), baked.
@@ -33,7 +38,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp, { type Sharp } from "sharp";
 import { BOARD, BOARD_PARTS } from "../lib/board-parts.ts";
-import { LANTERN, PROP_LIGHT, WARM, lanternFalloff, lanternGlass, warmLight } from "../lib/prop-light.ts";
+import { LANTERN, PROP_LIGHT, WARM, duskLight, lanternFalloff, lanternGlass, warmLight } from "../lib/prop-light.ts";
+import { DUSK_POSTER, OPENED_BOARD_WIDTHS, SOFT_POSTER } from "../lib/square-poster.ts";
 
 const root = process.cwd();
 const outDir = join(root, "public", "img", "square");
@@ -424,6 +430,8 @@ interface PropLight {
   key: number[];
   /** Lamplight from the scene's lights: strength and where it comes from. */
   warm: { strength: number; dir: { x: number; y: number } };
+  /** Share of it laid across the whole face (the rest goes to the rims). */
+  ramp: number;
   /** Width of a rim towards that light, image px. */
   rim: number;
   /** The board's lantern, 0–1. */
@@ -460,7 +468,7 @@ function lightProp(image: PropImage, light: PropLight): Buffer {
       for (let c = 0; c < 3; c++) {
         const albedo = data[i + c]! / 255;
         let colour = albedo * light.key[c]!;
-        colour += albedo * warm[c]! * (PROP_LIGHT.ramp * ramp + PROP_LIGHT.rim * rim);
+        colour += albedo * warm[c]! * (light.ramp * ramp + PROP_LIGHT.rim * rim);
         colour += albedo * LANTERN.flame[c]! * falloff + LANTERN.flame[c]! * glass;
         colour += (light.air[c]! - colour) * light.haze;
         out[i + c] = Math.round(Math.min(1, Math.max(0, colour)) * 255);
@@ -483,17 +491,61 @@ async function writeProps() {
   const opened = lightProp(source, {
     key: OPEN_TINT,
     warm: { strength: 0, dir: { x: 0, y: -1 } },
+    ramp: 0,
     rim: 0,
     lantern: 1,
     air: [0, 0, 0],
     haze: 0,
   });
-  const board = sharp(opened, { raw: { width: source.width, height: source.height, channels: 4 } });
-  const info = await encode(board.clone(), "board-open");
-  console.log(`board-open.webp  ${info.width}×${info.height}  ${Math.round(info.size / 1024)} KB`);
-  // The page shows it first thing on the board's own address: AVIF where the browser takes it.
-  const avif = await board.avif({ quality: 52, effort: 6, chromaSubsampling: "4:4:4" }).toFile(join(outDir, "board-open.avif"));
-  console.log(`board-open.avif  ${avif.width}×${avif.height}  ${Math.round(avif.size / 1024)} KB`);
+  // The page shows it first thing on the board's own address: AVIF where the browser takes it, in the size it needs.
+  for (const width of OPENED_BOARD_WIDTHS) {
+    const board = sharp(opened, { raw: { width: source.width, height: source.height, channels: 4 } }).resize({ width, kernel: "lanczos3" });
+    const webp = await encode(board.clone(), `board-open-${width}`);
+    const avif = await board.avif({ quality: 50, effort: 7, chromaSubsampling: "4:4:4" }).toFile(join(outDir, `board-open-${width}.avif`));
+    console.log(`board-open-${width}  ${webp.width}×${webp.height}  webp ${Math.round(webp.size / 1024)} KB, avif ${Math.round(avif.size / 1024)} KB`);
+  }
+}
+
+// ------------------------------------------------------------ posters
+
+/** Bloom on the plate at rest, as the plate shader lays it (uBloom). */
+const BLOOM = 0.32;
+const BLOOM_TINT = [1.0, 0.7, 0.38];
+
+/**
+ * The end of dusk as the plate shader draws it with every light on and
+ * burning steady: dusk-base, square-dusk where a light glows, its bloom.
+ */
+async function writePosters(base: Plane, dusk: Plane, mask: Plane, glowIds: Uint8Array, idBuf: Buffer) {
+  const out = Buffer.alloc(N * 3);
+  for (let i = 0; i < N; i++) {
+    const glows = glowIds[i]! > 0;
+    const g = idBuf[i * 3 + 1]! / 255;
+    const bloom = glows ? g * g * BLOOM : 0;
+    for (let c = 0; c < 3; c++) {
+      let colour = base[i * 3 + c]! / 255;
+      if (glows) colour += (dusk[i * 3 + c]! / 255 - colour) * mask[i]!;
+      colour += BLOOM_TINT[c]! * bloom * (1 - colour * 0.6);
+      out[i * 3 + c] = Math.round(Math.min(1, Math.max(0, colour)) * 255);
+    }
+  }
+  const raw = () => sharp(out, { raw: { width: W, height: H, channels: 3 } });
+  for (const width of DUSK_POSTER.widths) {
+    const image = raw().resize({ width, kernel: "lanczos3" });
+    const avif = await image.clone().avif({ quality: 56, effort: 6, chromaSubsampling: "4:4:4" }).toFile(join(outDir, `poster-dusk-${width}.avif`));
+    const webp = await image.webp({ quality: 80, effort: 6, smartSubsample: true }).toFile(join(outDir, `poster-dusk-${width}.webp`));
+    console.log(`poster-dusk-${width}  avif ${Math.round(avif.size / 1024)} KB, webp ${Math.round(webp.size / 1024)} KB`);
+  }
+  // Behind the opened board: dimmed as the scene dims it, then out of focus.
+  const { rect, scale, blur, dim } = SOFT_POSTER;
+  const soft = await raw()
+    .extract({ left: rect.x, top: rect.y, width: rect.w, height: rect.h })
+    .linear([...dim], [0, 0, 0])
+    .blur(blur)
+    .resize({ width: Math.round(rect.w * scale), kernel: "lanczos3" })
+    .webp({ quality: 78, effort: 6, smartSubsample: true })
+    .toFile(join(outDir, "poster-dusk-soft.webp"));
+  console.log(`poster-dusk-soft.webp  ${soft.width}×${soft.height}  ${Math.round(soft.size / 1024)} KB`);
 }
 
 // ------------------------------------------------------------ board writing
@@ -657,14 +709,16 @@ async function writeDuskProps(base: Plane, lights: ReadonlyArray<Light>) {
   const burning = lights.map((l) => ({ kind: l.kind, x: l.x, y: l.y, level: 1, flicker: 1 }));
   const grow = (b: Rect, by: number): Rect => ({ x0: b.x0 - by, y0: b.y0 - by, x1: b.x1 + by, y1: b.y1 + by });
   for (const [name, prop] of Object.entries(STANDING)) {
-    const key = PROP_LIGHT.golden.map((k, c) => k * PROP_LIGHT.dusk[c]!);
     const sign = name !== "board";
+    const dusk = duskLight(sign);
+    const key = PROP_LIGHT.golden.map((k, c) => k * dusk[c]!);
     // Lamplight is gathered where the scene gathers it: the signpost's or the board's middle.
     const at = sign ? { x: 2063, y: 1087 } : { x: 830, y: 838 };
     const image = await loadProp(prop.source);
     const lit = lightProp(image, {
       key,
       warm: warmLight(at, burning),
+      ramp: sign ? PROP_LIGHT.signRamp : PROP_LIGHT.ramp,
       rim: PROP_LIGHT.rimPx / prop.cssPerPixel,
       lantern: sign ? 0 : 1,
       air: meanRgb(base, grow(prop.box, 160)),
@@ -799,6 +853,7 @@ async function main() {
   await writeDuskProps(Float32Array.from(baseBuf), lights);
   await writeVariants("dusk-lights", lightsBuf, 4, false);
   await writeVariants("lights", idBuf, 3, true, true);
+  await writePosters(base, dusk, mask, glowIds, idBuf);
 
   // How far the finished dusk sits from square-dusk, away from the lights.
   let diff = 0;

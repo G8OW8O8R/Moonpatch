@@ -24,8 +24,8 @@ const tall = variants("gate-tall");
  * screens get gate.jpg, portrait phones the tall plate of the same scene. Both
  * are cover-fitted with the shared plate geometry; the variants are
  * pre-encoded by `pnpm images`, so this is a plain <picture>. Where the page
- * opens elsewhere (on the notice board), it is not the first thing seen and
- * gives up its priority.
+ * opens elsewhere (on the notice board), it is not the first thing seen: it
+ * stays out of sight and waits until the scene asks for it.
  */
 export function GatePoster({ alt, priority = true }: { alt: string; priority?: boolean }) {
   const preloads = priority
@@ -58,7 +58,8 @@ export function GatePoster({ alt, priority = true }: { alt: string; priority?: b
           alt={alt}
           width={PLATE.width}
           height={PLATE.height}
-          fetchPriority={priority ? "high" : "auto"}
+          fetchPriority={priority ? "high" : "low"}
+          loading={priority ? "eager" : "lazy"}
           decoding={priority ? "sync" : "async"}
           draggable={false}
           className="gate-poster absolute inset-0 size-full object-cover select-none"

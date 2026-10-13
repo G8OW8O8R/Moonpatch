@@ -99,12 +99,29 @@ export const PROP_LIGHT = {
   warm: 0.6,
   ramp: 0.6,
   rim: 0.9,
+  /**
+   * The signpost's planks are pale, weathered wood standing out in the open:
+   * dusk takes more of their light than the board's, and cools it further
+   * (multiplied into `dusk`, so it follows the same grade curve). Lamplight
+   * reaches them only from the side of the strings: barely across the face,
+   * on the edges turned to the lights.
+   */
+  signDusk: [0.88, 0.93, 1.02] as const,
+  signRamp: 0.3,
   /** Distance from an edge counted as its rim, CSS px on screen. */
   rimPx: 2.5,
   /** Pointed at: a touch brighter, and catching a little more warm light. */
   hoverLift: 0.07,
   hoverWarm: 0.14,
 } as const;
+
+/** Dusk's light on a prop: the signpost's own, or the one every other prop shares. */
+export function duskLight(sign: boolean): [number, number, number] {
+  const [r, g, b] = PROP_LIGHT.dusk;
+  if (!sign) return [r, g, b];
+  const [sr, sg, sb] = PROP_LIGHT.signDusk;
+  return [r * sr, g * sg, b * sb];
+}
 
 /** The lantern on the notice board, in pixels of noticeboard.png. */
 export const LANTERN = {

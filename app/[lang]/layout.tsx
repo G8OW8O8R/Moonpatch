@@ -47,9 +47,11 @@ export default async function LangLayout({ children, params }: LayoutProps<"/[la
   if (!isLocale(lang)) notFound();
   const t = getMessages(lang);
 
+  // Browser extensions write their own attributes onto <html> and <body> before the page hydrates;
+  // those two elements only, never what is inside them, are spared the mismatch.
   return (
-    <html lang={lang} className={fontVariables} style={motionCssVars() as CSSProperties}>
-      <body>
+    <html lang={lang} className={fontVariables} style={motionCssVars() as CSSProperties} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <SiteHeader lang={lang} t={t.header} />
         {children}
         <ScrollMoon />

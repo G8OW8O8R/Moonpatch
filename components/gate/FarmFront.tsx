@@ -1,7 +1,8 @@
 import { preload } from "react-dom";
 import type { Locale } from "@/lib/i18n";
 import { getMessages } from "@/lib/messages";
-import { OPENED_BOARD_AVIF } from "@/lib/square-props";
+import { SOFT_POSTER, openedBoardFile, openedBoardSrcSet } from "@/lib/square-poster";
+import { openedBoardSizes } from "@/lib/square-props";
 import { visitCopy } from "@/lib/visit";
 import { GatePoster } from "./GatePoster";
 import { GateScene } from "./GateScene";
@@ -14,7 +15,17 @@ import { GateScene } from "./GateScene";
 export function FarmFront({ lang, initialView = "gate" }: { lang: Locale; initialView?: "gate" | "visit" }) {
   const { gate, square, visit } = getMessages(lang);
   // Opened on the board, the board is the first thing seen.
-  if (initialView === "visit") preload(OPENED_BOARD_AVIF, { as: "image", type: "image/avif", fetchPriority: "high" });
+  if (initialView === "visit") {
+    preload(openedBoardFile(1160, "avif"), {
+      as: "image",
+      type: "image/avif",
+      imageSrcSet: openedBoardSrcSet("avif"),
+      imageSizes: openedBoardSizes(),
+      fetchPriority: "high",
+    });
+    // The square out of focus behind it: a few kilobytes, wanted in the same first frame.
+    preload(SOFT_POSTER.src, { as: "image", type: "image/webp", fetchPriority: "high" });
+  }
 
   return (
     <main>

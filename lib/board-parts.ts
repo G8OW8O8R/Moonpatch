@@ -24,3 +24,24 @@ export const BOARD_PARTS = {
     drawings: { x: 708, y: 980, w: 314, h: 386, rotate: 3.6 },
   },
 } as const;
+
+/**
+ * Where each card's words go, board px: clear of its pin or peg, of the
+ * curl at its corner and of the kraft note pinned over it. `notch` is the
+ * corner the note covers: words keep out of x ≥ notch.x from y ≥ notch.y on.
+ */
+export const BOARD_TEXT = {
+  hours: { x: 392, y: 580, w: 240, h: 330, notch: { x: 552, y: 790 } },
+  whatsOn: { x: 788, y: 622, w: 206, h: 176 },
+  note: { x: 600, y: 856, w: 196, h: 256 },
+} as const;
+
+/** What lies over the cards, board px: the kraft note, the pins and the pegs. Nothing written may run beneath them. */
+export const BOARD_COVERS = {
+  note: { x: 562, y: 798, w: 272, h: 344, over: ["hours", "whatsOn", "map", "drawings"] },
+  hoursPin: { x: 496, y: 540, w: 26, h: 26, over: ["hours"] },
+  mapPin: { x: 483, y: 991, w: 26, h: 26, over: ["map"] },
+  whatsOnPeg: { x: 876, y: 498, w: 38, h: 116, over: ["whatsOn"] },
+  notePeg: { x: 668, y: 732, w: 36, h: 112, over: ["note", "hours"] },
+  drawingsPeg: { x: 872, y: 912, w: 40, h: 112, over: ["drawings"] },
+} as const;

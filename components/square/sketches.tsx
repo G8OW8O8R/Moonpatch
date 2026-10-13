@@ -1,145 +1,177 @@
 /**
- * Pen drawings on the notice board's cards. Coordinates are the card's own
- * pixels on noticeboard.png, so the drawings scale with the board. Lines
- * carry pathLength=1, which lets CSS draw them in when the board opens.
+ * Pen drawings on the notice board's cards. Each drawing's coordinates are
+ * pixels of noticeboard.png (its viewBox is its card), so it scales with the
+ * board and keeps clear of the note, the pins and the pegs where they are.
+ * Lines carry pathLength=1, which lets CSS draw them in when the board opens,
+ * one after another by their --delay.
  */
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { BOARD_PARTS } from "@/lib/board-parts";
 
-type Point = readonly [number, number];
+const viewBox = (card: keyof typeof BOARD_PARTS.cards) => {
+  const c = BOARD_PARTS.cards[card];
+  return `${c.x} ${c.y} ${c.w} ${c.h}`;
+};
 
-/** A wobbly hand line through points: each segment a gentle curve rather than a ruler stroke. */
-function hand(points: readonly Point[], closed = false): string {
-  const [first, ...rest] = points;
-  if (!first) return "";
-  let d = `M${first[0].toFixed(1)} ${first[1].toFixed(1)}`;
-  let prev = first;
-  rest.forEach((p, i) => {
-    const wobble = ((i * 37) % 7) / 7 - 0.5;
-    const mx = (prev[0] + p[0]) / 2 + (p[1] - prev[1]) * 0.08 * wobble;
-    const my = (prev[1] + p[1]) / 2 - (p[0] - prev[0]) * 0.08 * wobble;
-    d += ` Q${mx.toFixed(1)} ${my.toFixed(1)} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
-    prev = p;
-  });
-  return closed ? `${d} Z` : d;
+/** A group of lines drawn in together, after `delay` seconds. */
+function Stroke({ delay, children }: { delay: number; children: ReactNode }) {
+  return <g style={{ "--delay": `${delay}s` } as CSSProperties}>{children}</g>;
 }
 
-/** A shape given on a unit grid, scaled, turned and moved. */
-function placed(points: readonly Point[], at: Point, size: number, degrees: number): Point[] {
-  const a = (degrees * Math.PI) / 180;
-  const cos = Math.cos(a);
-  const sin = Math.sin(a);
-  return points.map(([x, y]) => [at[0] + size * (x * cos - y * sin), at[1] + size * (x * sin + y * cos)] as const);
+function Line({ d }: { d: string }) {
+  return <path pathLength={1} className="sketch-line" d={d} />;
 }
 
-const MAPLE: Point[] = [
-  [0, -1], [0.16, -0.62], [0.46, -0.78], [0.38, -0.36], [0.86, -0.42], [0.62, -0.06], [0.76, 0.16],
-  [0.36, 0.2], [0.42, 0.46], [0.08, 0.36], [0, 0.6], [-0.08, 0.36], [-0.42, 0.46], [-0.36, 0.2],
-  [-0.76, 0.16], [-0.62, -0.06], [-0.86, -0.42], [-0.38, -0.36], [-0.46, -0.78], [-0.16, -0.62], [0, -1],
-];
-
-function Leaf({ at, size, turn, delay }: { at: Point; size: number; turn: number; delay: number }) {
-  const style = { "--delay": `${delay}s` } as CSSProperties;
+/** The farm gate: two capped posts, the arched beam with the moon over it, both leaves swung open. */
+function Gate({ x, y }: { x: number; y: number }) {
   return (
-    <g style={style}>
-      <path pathLength={1} className="sketch-line" d={hand(placed(MAPLE, at, size, turn))} />
-      <path pathLength={1} className="sketch-line" d={hand(placed([[0, 1.05], [0, 0.6], [0, -0.78]], at, size, turn))} />
-      <path pathLength={1} className="sketch-line" d={hand(placed([[0, 0.25], [0.62, -0.3]], at, size, turn))} />
-      <path pathLength={1} className="sketch-line" d={hand(placed([[0, 0.25], [-0.62, -0.3]], at, size, turn))} />
-    </g>
+    <>
+      <Line d={`M${x} ${y + 54} V${y + 4} M${x + 50} ${y + 54} V${y + 4} M${x - 3} ${y + 4} h6 M${x + 47} ${y + 4} h6`} />
+      <Line d={`M${x - 4} ${y + 12} Q${x + 25} ${y - 8} ${x + 54} ${y + 12}`} />
+      <Line d={`M${x + 1} ${y + 22} L${x + 15} ${y + 28} V${y + 52} L${x + 1} ${y + 48} M${x + 1} ${y + 36} L${x + 15} ${y + 40}`} />
+      <Line d={`M${x + 49} ${y + 22} L${x + 35} ${y + 28} V${y + 52} L${x + 49} ${y + 48} M${x + 49} ${y + 36} L${x + 35} ${y + 40}`} />
+      <Line d={`M${x + 28} ${y - 30} a11 11 0 1 0 9 17 a8.5 8.5 0 1 1 -9 -17 z`} />
+    </>
   );
 }
 
-/** An outline with a dent at top and bottom, ribs bowing out from the stem, a crooked stem and a curl of vine. */
-function Pumpkin({ at, w, h, delay }: { at: Point; w: number; h: number; delay: number }) {
-  const [x, y] = at;
+/** Red barn: gambrel roof, big doors with a cross. */
+function Barn({ x, y }: { x: number; y: number }) {
+  return (
+    <Line
+      d={`M${x} ${y + 40} V${y + 16} L${x + 6} ${y + 5} L${x + 18} ${y - 2} L${x + 30} ${y + 5} L${x + 36} ${y + 16} V${y + 40} Z M${x + 10} ${y + 40} V${y + 22} H${x + 26} V${y + 40} M${x + 10} ${y + 22} L${x + 26} ${y + 40} M${x + 26} ${y + 22} L${x + 10} ${y + 40}`}
+    />
+  );
+}
+
+/** Cream café: a gable, a porch on two posts, a door. */
+function Cafe({ x, y }: { x: number; y: number }) {
+  return (
+    <Line
+      d={`M${x} ${y + 40} V${y + 16} L${x + 19} ${y + 2} L${x + 38} ${y + 16} V${y + 40} Z M${x - 3} ${y + 24} H${x + 41} M${x + 4} ${y + 24} V${y + 40} M${x + 34} ${y + 24} V${y + 40} M${x + 16} ${y + 40} V${y + 30} H${x + 22} V${y + 40} M${x + 16} ${y + 11} h6 v5 h-6 z`}
+    />
+  );
+}
+
+/** The haunt shop: tall and steep, a lit window up in the gable. */
+function Shop({ x, y }: { x: number; y: number }) {
+  return (
+    <Line
+      d={`M${x} ${y + 40} V${y + 14} L${x + 14} ${y - 8} L${x + 28} ${y + 14} V${y + 40} Z M${x + 11} ${y + 3} h6 v8 h-6 z M${x + 5} ${y + 22} h7 v9 h-7 z M${x + 17} ${y + 22} h6 v18`}
+    />
+  );
+}
+
+function Tree({ x, y }: { x: number; y: number }) {
+  return <Line d={`M${x} ${y} c-9 0 -12 -9 -7 -14 c-3 -8 6 -14 12 -10 c6 -5 14 1 11 8 c5 5 1 15 -8 15 z M${x + 3} ${y + 1} v10`} />;
+}
+
+/**
+ * Hollow Road from the gate down to the farm, drawn as a field track: two
+ * edges and a few tufts of grass along it.
+ */
+export function NoticeMap({ labels, title }: { labels: { gate: string; road: string; farm: string }; title: string }) {
+  return (
+    <svg viewBox={viewBox("map")} className="notice-sketch" role="img" aria-label={title}>
+      <Stroke delay={0}>
+        <Gate x={396} y={1052} />
+      </Stroke>
+      <Stroke delay={0.35}>
+        <Line d="M414 1112 C 420 1160, 600 1146, 604 1198 S 520 1256, 455 1279" />
+        <Line d="M432 1110 C 440 1148, 624 1136, 626 1198 S 540 1266, 473 1279" />
+      </Stroke>
+      <Stroke delay={0.7}>
+        <Line d="M520 1132 l3 -7 m3 8 l2 -6 M612 1166 l3 -7 m3 8 l2 -6 M500 1262 l3 -7 m3 8 l2 -6" />
+        <Tree x={404} y={1156} />
+        <Tree x={548} y={1250} />
+      </Stroke>
+      <Stroke delay={0.95}>
+        <Barn x={392} y={1286} />
+        <Cafe x={440} y={1286} />
+        <Shop x={490} y={1286} />
+      </Stroke>
+      <g className="map-labels" style={{ "--delay": "0.5s" } as CSSProperties}>
+        <text x={460} y={1090} className="map-label">
+          {labels.gate}
+        </text>
+        <text x={392} y={1214} className="map-label">
+          {labels.road}
+        </text>
+        <text x={392} y={1348} className="map-label" style={{ "--delay": "1.2s" } as CSSProperties}>
+          {labels.farm}
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+/** A pumpkin: the outline dented at top and bottom, ribs bowing out from the stem, a crooked stem and a curl of vine. */
+function Pumpkin({ x, y, w, h }: { x: number; y: number; w: number; h: number }) {
   const top = y - h / 2;
   const bottom = y + h / 2;
   const dent = h * 0.08;
-  const n = (v: number) => v.toFixed(1);
+  const n = (v: number) => +v.toFixed(1);
   const outline =
     `M${n(x)} ${n(top + dent)} C${n(x + w * 0.58)} ${n(top - h * 0.1)} ${n(x + w * 0.62)} ${n(bottom + h * 0.08)} ${n(x)} ${n(bottom - dent)} ` +
     `C${n(x - w * 0.62)} ${n(bottom + h * 0.08)} ${n(x - w * 0.58)} ${n(top - h * 0.1)} ${n(x)} ${n(top + dent)}`;
   const rib = (k: number) =>
-    `M${n(x)} ${n(top + dent)} C${n(x + k * w)} ${n(top + h * 0.02)} ${n(x + k * w)} ${n(bottom - h * 0.02)} ${n(x)} ${n(bottom - dent)}`;
-  const style = { "--delay": `${delay}s` } as CSSProperties;
+    `M${n(x)} ${n(top + dent)} C${n(x + k * w)} ${n(top + h * 0.04)} ${n(x + k * w)} ${n(bottom - h * 0.04)} ${n(x)} ${n(bottom - dent)}`;
+  const s = h / 90;
   return (
-    <g style={style}>
-      <path pathLength={1} className="sketch-line" d={outline} />
-      {[-0.4, -0.16, 0.16, 0.4].map((k) => (
-        <path key={k} pathLength={1} className="sketch-line" d={rib(k)} />
+    <>
+      <Line d={outline} />
+      {[-0.36, -0.13, 0.13, 0.36].map((k) => (
+        <Line key={k} d={rib(k)} />
       ))}
-      <path pathLength={1} className="sketch-line" d={hand([[x - 3, top + dent], [x - 2, top - 10], [x + 5, top - 16]])} />
-      <path pathLength={1} className="sketch-line" d={hand([[x + 4, top + dent - 1], [x + 6, top - 8], [x + 11, top - 13]])} />
-      <path pathLength={1} className="sketch-line" d={`M${n(x + 4)} ${n(top - 6)} c 10 -10 22 -4 18 4 c -3 6 -12 4 -10 -2 c 2 -5 9 -4 9 0`} />
-    </g>
+      <Line
+        d={`M${n(x - 4 * s)} ${n(top + dent)} q${n(1 * s)} ${n(-10 * s)} ${n(9 * s)} ${n(-17 * s)} l${n(5 * s)} ${n(4 * s)} q${n(-6 * s)} ${n(5 * s)} ${n(-5 * s)} ${n(13 * s)}`}
+      />
+      <Line
+        d={`M${n(x + 6 * s)} ${n(top - 2 * s)} c${n(10 * s)} ${n(-12 * s)} ${n(26 * s)} ${n(-6 * s)} ${n(21 * s)} ${n(4 * s)} c${n(-3 * s)} ${n(6 * s)} ${n(-12 * s)} ${n(4 * s)} ${n(-10 * s)} ${n(-2 * s)}`}
+      />
+    </>
   );
 }
 
-function Tree({ at, delay }: { at: Point; delay: number }) {
-  const [x, y] = at;
+/** A maple leaf: seven lobes, a stem and its veins, in one sure line. */
+function MapleLeaf({ x, y, size, turn }: { x: number; y: number; size: number; turn: number }) {
+  const k = size / 100;
+  // The group is scaled; the pen is not.
+  const pen = { strokeWidth: `calc(var(--pen) / ${k})` } as CSSProperties;
   return (
-    <g style={{ "--delay": `${delay}s` } as CSSProperties}>
+    <g transform={`translate(${x} ${y}) rotate(${turn}) scale(${k})`}>
       <path
         pathLength={1}
         className="sketch-line"
-        d={`M${x} ${y - 15} c 8 0 13 6 12 12 c 4 3 3 11 -3 12 c -3 4 -14 4 -18 0 c -6 -1 -7 -9 -3 -12 c -1 -6 4 -12 12 -12 z`}
+        style={pen}
+        d="M0 -50 L9 -27 L22 -34 L18 -10 L42 -22 L36 -4 L50 0 L28 12 L33 22 L8 18 L4 40 L-4 40 L-8 18 L-33 22 L-28 12 L-50 0 L-36 -4 L-42 -22 L-18 -10 L-22 -34 L-9 -27 Z"
       />
-      <path pathLength={1} className="sketch-line" d={`M${x} ${y + 9} v 13 M${x} ${y + 14} l 5 -5`} />
+      <path
+        pathLength={1}
+        className="sketch-line"
+        style={pen}
+        d="M0 62 Q2 48 0 40 V-38 M0 6 L30 -14 M0 6 L-30 -14 M0 22 L22 14 M0 22 L-22 14"
+      />
     </g>
   );
 }
 
-/** Hollow Road from the gate to the farm, with a moon over it. */
-export function NoticeMap({ labels, title }: { labels: { gate: string; road: string; farm: string }; title: string }) {
-  return (
-    <div role="img" aria-label={title} className="relative size-full">
-      <svg viewBox="0 0 272 366" className="notice-sketch" aria-hidden="true">
-        <g style={{ "--delay": "0s" } as CSSProperties}>
-          <path pathLength={1} className="sketch-line" d="M36 22 A17 17 0 1 0 47 51 A13 13 0 1 1 36 22 Z" />
-        </g>
-        <g style={{ "--delay": "0.15s" } as CSSProperties}>
-          <path pathLength={1} className="sketch-line" d={hand([[140, 92], [140, 52]])} />
-          <path pathLength={1} className="sketch-line" d={hand([[176, 92], [176, 52]])} />
-          <path pathLength={1} className="sketch-line" d="M138 54 Q158 36 178 54" />
-          <path pathLength={1} className="sketch-line" d={hand([[142, 66], [174, 66], [174, 84], [142, 84], [142, 66], [174, 84]])} />
-        </g>
-        <g style={{ "--delay": "0.35s" } as CSSProperties}>
-          <path pathLength={1} className="sketch-line" d="M150 94 C 132 122, 50 150, 66 190 S 196 226, 150 262 S 50 300, 34 340" />
-          <path pathLength={1} className="sketch-line" d="M166 94 C 152 126, 74 156, 90 190 S 220 222, 176 266 S 80 306, 72 342" />
-        </g>
-        <Tree at={[40, 128]} delay={0.6} />
-        <Tree at={[214, 176]} delay={0.7} />
-        <Tree at={[228, 222]} delay={0.75} />
-        <Tree at={[28, 236]} delay={0.85} />
-        <g style={{ "--delay": "0.9s" } as CSSProperties}>
-          <path pathLength={1} className="sketch-line" d={hand([[24, 352], [46, 336], [68, 352]])} />
-          <path pathLength={1} className="sketch-line" d={hand([[28, 350], [28, 366], [64, 366], [64, 350]])} />
-        </g>
-      </svg>
-      <span className="map-label" style={{ right: "53%", top: "21%", "--delay": "0.5s" } as CSSProperties}>
-        {labels.gate}
-      </span>
-      <span className="map-label" style={{ left: "30%", bottom: "8%", "--delay": "1s" } as CSSProperties}>
-        {labels.road}
-        <br />
-        {labels.farm}
-      </span>
-    </div>
-  );
-}
-
-/** Three pumpkins and a few maple leaves. */
+/** Three pumpkins and a maple leaf. */
 export function PumpkinSketch({ title }: { title: string }) {
   return (
-    <svg viewBox="0 0 314 386" className="notice-sketch" role="img" aria-label={title}>
-      <Pumpkin at={[206, 196]} w={124} h={92} delay={0.1} />
-      <Pumpkin at={[96, 286]} w={96} h={72} delay={0.3} />
-      <Pumpkin at={[230, 306]} w={92} h={70} delay={0.45} />
-      <Leaf at={[262, 52]} size={30} turn={18} delay={0.55} />
-      <Leaf at={[158, 70]} size={24} turn={-12} delay={0.6} />
-      <Leaf at={[52, 196]} size={26} turn={-38} delay={0.7} />
-      <Leaf at={[150, 352]} size={20} turn={8} delay={0.8} />
-      <Leaf at={[46, 356]} size={18} turn={-20} delay={0.85} />
+    <svg viewBox={viewBox("drawings")} className="notice-sketch" role="img" aria-label={title}>
+      <Stroke delay={0.05}>
+        <Pumpkin x={868} y={1222} w={128} h={92} />
+      </Stroke>
+      <Stroke delay={0.3}>
+        <Pumpkin x={772} y={1300} w={92} h={68} />
+      </Stroke>
+      <Stroke delay={0.5}>
+        <Pumpkin x={956} y={1246} w={74} h={58} />
+      </Stroke>
+      <Stroke delay={0.7}>
+        <MapleLeaf x={962} y={1082} size={86} turn={14} />
+      </Stroke>
     </svg>
   );
 }

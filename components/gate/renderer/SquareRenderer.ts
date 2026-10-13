@@ -7,7 +7,7 @@
  */
 import type { PlateWindow } from "@/lib/gate-rig";
 import { PLATE, type Size } from "@/lib/plate-box";
-import { type BurningLight, type LightKind, LANTERN, PROP_LIGHT, WARM, type WarmLight, warmLight } from "@/lib/prop-light";
+import { type BurningLight, type LightKind, LANTERN, PROP_LIGHT, WARM, type WarmLight, duskLight, warmLight } from "@/lib/prop-light";
 import {
   type ArmId,
   BOARD_PARTS,
@@ -114,6 +114,8 @@ interface PropLook {
   /** The board up close, 0–1. */
   open?: number;
   lantern?: number;
+  /** One of the signpost's planks or its post: dusk's light on them is their own. */
+  sign?: boolean;
 }
 
 const smoothstep = (a: number, b: number, x: number) => {
@@ -293,6 +295,7 @@ export class SquareRenderer {
           label: arm ? this.labels.get(arm) : undefined,
           paint: SIGN_PAINT,
           wear: 1,
+          sign: true,
         });
       }
     }
@@ -424,7 +427,7 @@ export class SquareRenderer {
     gl.uniform2f(p.uniform("uPlate"), PLATE.width, PLATE.height);
     gl.uniform1f(p.uniform("uAirLod"), PROP_LIGHT.airLod);
     gl.uniform3f(p.uniform("uKey"), ...PROP_LIGHT.golden);
-    gl.uniform3f(p.uniform("uDusk"), ...PROP_LIGHT.dusk);
+    gl.uniform3f(p.uniform("uDusk"), ...duskLight(!!look.sign));
     gl.uniform1f(p.uniform("uGrade"), scene.grade);
     gl.uniform1f(p.uniform("uCool"), 1);
     gl.uniform3f(p.uniform("uOpenTint"), ...TINT.open);
@@ -439,7 +442,7 @@ export class SquareRenderer {
       (look.warm.dir.x * PROP_LIGHT.rimPx) / (quad.rect.w * window.scale),
       (look.warm.dir.y * PROP_LIGHT.rimPx) / (quad.rect.h * window.scale),
     );
-    gl.uniform1f(p.uniform("uRamp"), PROP_LIGHT.ramp);
+    gl.uniform1f(p.uniform("uRamp"), look.sign ? PROP_LIGHT.signRamp : PROP_LIGHT.ramp);
     gl.uniform1f(p.uniform("uRim"), PROP_LIGHT.rim);
     gl.uniform1f(p.uniform("uHover"), look.pointed);
     gl.uniform1f(p.uniform("uHoverLift"), PROP_LIGHT.hoverLift);

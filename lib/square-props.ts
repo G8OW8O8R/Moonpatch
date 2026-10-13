@@ -37,9 +37,6 @@ export const ARM_FACE: Readonly<Record<"left" | "right", Rect>> = {
   right: { x: 0.12, y: 0.1, w: 0.74, h: 0.8 },
 };
 
-/** The board in the lantern's light, as the camera arrives on it: baked by `pnpm square`, never filtered on the page. */
-export const OPENED_BOARD = "/img/square/board-open.webp";
-export const OPENED_BOARD_AVIF = "/img/square/board-open.avif";
 
 export { BOARD, BOARD_PARTS };
 
@@ -296,6 +293,15 @@ export function openedBoard(viewport: Size): Rect {
   const corkTop = HEADER_ROOM + Math.max(0, (room.h - cork.h * scale) / 2);
   const x = viewport.width / 2 - (fit.x + fit.w / 2) * scale;
   return { x, y: corkTop - cork.y * scale, w: BOARD.width * scale, h: BOARD.height * scale };
+}
+
+/** The opened board's width on screen as an image `sizes` list: openedBoard's own sum, for the browser to pick a file by. */
+export function openedBoardSizes(): string {
+  const { cork } = BOARD_PARTS;
+  const n = (v: number) => +v.toFixed(4);
+  const tall = `calc((100vh - ${HEADER_ROOM + 24}px) * ${n(BOARD.width / cork.h)})`;
+  const wide = (side: number, fit: number) => `calc((100vw - ${2 * side}px) * ${n(BOARD.width / fit)})`;
+  return `(max-width: 639px) min(${wide(8, CARD_SPAN.w)}, ${tall}), min(${wide(32, cork.w)}, ${tall})`;
 }
 
 /**

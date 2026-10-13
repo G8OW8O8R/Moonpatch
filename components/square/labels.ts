@@ -158,7 +158,14 @@ export async function drawArmLabels(labels: Record<ArmId, string>, lang: string)
  * Font size for each label as a share of its arm's height, for the
  * plain-HTML signpost, measured with the same font and the same rule.
  */
+/** Sizes already measured, by language: the plain-HTML arms are lettered right in their first frame. */
+const measured = new Map<string, Partial<Record<ArmId, number>>>();
+
+export const knownArmLabelSizes = (lang: string): Partial<Record<ArmId, number>> => measured.get(lang) ?? {};
+
 export async function armLabelSizes(labels: Record<ArmId, string>, lang: string): Promise<Partial<Record<ArmId, number>>> {
+  const known = measured.get(lang);
+  if (known) return known;
   const family = await loadPaintFont();
   const ctx = document.createElement("canvas").getContext("2d");
   if (!ctx || !family) return {};
@@ -167,5 +174,6 @@ export async function armLabelSizes(labels: Record<ArmId, string>, lang: string)
   for (const arm of ARMS) {
     sizes[arm.id] = fitSize(ctx, family, upper(labels[arm.id], lang), ARM.width, ARM.height, ARM_FACE[arm.points].w) / ARM.height;
   }
+  measured.set(lang, sizes);
   return sizes;
 }

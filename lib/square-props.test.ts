@@ -9,6 +9,7 @@ import {
   castShadow,
   intersects,
   openedBoard,
+  openedBoardSizes,
   propPlacement,
   propsOnScreen,
   quadOnScreen,
@@ -133,6 +134,24 @@ describe("the opened board", () => {
       expect(board.x + card.x * scale).toBeGreaterThanOrEqual(0);
       expect(board.x + (card.x + card.w) * scale).toBeLessThanOrEqual(viewport.width);
     }
+  });
+
+  it.each(all)("tells the browser its width on screen at $width×$height", (viewport) => {
+    // The sizes list read the way a browser reads it, for this viewport.
+    const length = (expr: string): number => {
+      const value = expr
+        .trim()
+        .replace(/100vw/g, String(viewport.width))
+        .replace(/100vh/g, String(viewport.height))
+        .replace(/px/g, "")
+        .replace(/calc|min/g, (fn) => (fn === "min" ? "Math.min" : ""));
+      return Number(new Function(`return ${value}`)());
+    };
+    const [phone, rest] = openedBoardSizes().split(/,\s(?=min\()/);
+    const narrow = viewport.width <= 639;
+    const width = length(narrow ? phone!.replace("(max-width: 639px)", "") : rest!);
+    // To the pixel: enough to pick the right file.
+    expect(width).toBeCloseTo(openedBoard(viewport).w, 0);
   });
 
   it.each(all)("is where the camera lands on the board at $width×$height", (viewport) => {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { SquareWarmup } from "@/components/square/SquareWarmup";
 import { Icon } from "@/components/ui/Icon";
 import { defaultLocale, isLocale, locales } from "@/lib/i18n";
 import { getMessages } from "@/lib/messages";
@@ -28,7 +29,7 @@ const srcSet = (room: RoomId, format: "avif" | "webp") =>
 export async function RoomPage({ room, params }: { room: RoomId; params: Promise<{ lang: string }> }) {
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const { rooms } = getMessages(lang);
+  const { rooms, square } = getMessages(lang);
   const copy = rooms[room];
 
   return (
@@ -52,6 +53,7 @@ export async function RoomPage({ room, params }: { room: RoomId; params: Promise
         <Icon name="arrow-left" className="drop-shadow-hug" />
         <span>{rooms.back}</span>
       </Link>
+      <SquareWarmup arms={square.arms} lang={lang} />
     </main>
   );
 }

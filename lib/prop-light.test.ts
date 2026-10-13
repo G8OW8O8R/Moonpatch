@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type BurningLight, FLICKER_GAIN, lanternFalloff, lanternGlass, LANTERN, warmLight } from "./prop-light";
+import { type BurningLight, FLICKER_GAIN, PROP_LIGHT, duskLight, lanternFalloff, lanternGlass, LANTERN, warmLight } from "./prop-light";
 
 const bulb = (x: number, y: number, level = 1, flicker = 1): BurningLight => ({ kind: "bulb", x, y, level, flicker });
 
@@ -54,5 +54,24 @@ describe("the lantern", () => {
     expect(lanternGlass(0)).toBe(1);
     expect(lanternGlass(LANTERN.glass)).toBe(0);
     expect(lanternGlass(LANTERN.glass + 30)).toBe(0);
+  });
+});
+
+describe("duskLight", () => {
+  const luma = ([r, g, b]: readonly number[]) => 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+
+  it("is the shared dusk for every prop but the signpost", () => {
+    expect(duskLight(false)).toEqual([...PROP_LIGHT.dusk]);
+  });
+
+  it("leaves the signpost's pale planks darker and cooler at dusk", () => {
+    const shared = duskLight(false);
+    const sign = duskLight(true);
+    const darker = 1 - luma(sign) / luma(shared);
+    expect(darker).toBeGreaterThan(0.05);
+    expect(darker).toBeLessThan(0.15);
+    expect(sign[2]! / sign[0]!).toBeGreaterThan(shared[2]! / shared[0]!);
+    // Less lamplight across the face: the warmth stays on the edges turned to the strings.
+    expect(PROP_LIGHT.signRamp).toBeLessThan(PROP_LIGHT.ramp);
   });
 });

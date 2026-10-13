@@ -248,7 +248,7 @@
 
   /* Started on the square (the way back from a building): it is simply there, never faded in over the gate. */
   .scene-stage[data-cut] .gate-poster {
-    visibility: hidden;
+    display: none;
   }
 
   .scene-stage[data-cut] .square-overlay .square-dusk {
@@ -368,7 +368,7 @@
 
   .tagline {
     font-style: italic;
-    font-size: clamp(2.25rem, 4.4vw, 5.25rem);
+    font-size: clamp(1.5rem, 2.65vw, 3.15rem);
     line-height: 1.04;
     letter-spacing: -0.01em;
     font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 0;
@@ -443,7 +443,7 @@
     }
 
     .tagline {
-      font-size: clamp(2rem, 9.4vw, 2.75rem);
+      font-size: clamp(1.375rem, 5.8vw, 1.75rem);
     }
 
     .hint-arrow-door {
@@ -453,15 +453,11 @@
 
   /* --------------------------------------------------------- the board */
 
-  /* A finger on the open board never scrolls the page beneath it. */
+  /* A finger on the open board never scrolls the page beneath it. The panel makes no stacking
+     context of its own, so the film laid over the board blends with the scene beneath it. */
   .visit-panel {
     touch-action: none;
     overscroll-behavior: contain;
-  }
-
-  /* Plain-HTML square: the plates go soft and dark behind the board. */
-  .scene-stage:has(> .visit-panel) :is(.square-plates, .square-props nav) {
-    filter: blur(6px) brightness(0.55);
   }
 
   /* The open panel shows the board itself; the one standing on the square steps aside. */
@@ -469,21 +465,70 @@
     visibility: hidden;
   }
 
-  /* Where the opened board stands: the same sum as openedBoard in
-     lib/square-props, on the pinned stage's own size (100vw × 100lvh), so it
-     paints in the right place straight from the server. Not painted at all
-     while the camera is still flying onto it. */
-  .notice-board {
+  /* The square's words are long gone once the camera is on the board: not laid out at all, so their
+     italic is never fetched for a board opened on its own address. */
+  .scene-stage:has(> .visit-panel[data-arrived]) .square-words {
+    display: none;
+  }
+
+  /* The square out of focus behind the board, baked. Placed first by the region of the plate the
+     scene shows there on a common screen of each shape, then exactly by the page; it steps aside
+     once the scene paints the same view. */
+  .visit-backdrop {
+    --vx: var(--wide-x);
+    --vy: var(--wide-y);
+    --vw: var(--wide-w);
+    --vh: var(--wide-h);
+    --s: max(calc(100vw / var(--vw)), calc(100lvh / var(--vh)));
+    left: calc(50vw - (var(--vx) + var(--vw) / 2 - var(--soft-x)) * var(--s));
+    top: calc(50lvh - (var(--vy) + var(--vh) / 2 - var(--soft-y)) * var(--s));
+    width: calc(var(--soft-w) * var(--s));
+    height: calc(var(--soft-h) * var(--s));
+    transform-origin: 0 0;
+    opacity: var(--arrive, 1);
+  }
+
+  @media (aspect-ratio < 4/5) {
+    .visit-backdrop {
+      --vx: var(--tall-x);
+      --vy: var(--tall-y);
+      --vw: var(--tall-w);
+      --vh: var(--tall-h);
+    }
+  }
+
+  .visit-backdrop[data-painted] {
+    opacity: 0;
+    transition: opacity var(--duration-panel) var(--ease-out);
+  }
+
+  /* Where the opened board stands: the same sum as openedBoard in lib/square-props, on the pinned
+     stage's own size (100vw × 100lvh), so it paints in the right place straight from the server. */
+  .board-place {
     --side: 32px;
     --fit-x: 320;
     --fit-w: 725;
     --room-w: calc(100vw - 2 * var(--side));
     --room-h: calc(100lvh - 112px - 24px);
     --s: min(calc(var(--room-w) / var(--fit-w)), calc(var(--room-h) / 935));
+    position: absolute;
     left: calc(50vw - (var(--fit-x) + var(--fit-w) / 2) * var(--s));
     top: calc(112px + max(0px, (var(--room-h) - 935 * var(--s)) / 2) - 480 * var(--s));
     width: calc(1345 * var(--s));
     height: calc(2226 * var(--s));
+  }
+
+  /* Phones: the cards, not the whole cork, fill the width. */
+  @media (max-width: 639px) {
+    .board-place {
+      --side: 8px;
+      --fit-x: 360;
+      --fit-w: 670;
+    }
+  }
+
+  /* Not painted at all while the camera is still flying onto it. */
+  .notice-board {
     container-type: inline-size;
     color: var(--color-ink);
     visibility: hidden;
@@ -507,59 +552,95 @@
     }
   }
 
-  /* Padding in board widths: a percentage would be taken from the whole board. */
+  /* Every size on a card is in pixels of the board image (--bp), so the words keep their place on
+     the paper at any size. Each card's box already keeps clear of its pin or peg, its curl and the
+     note pinned over it. */
   .notice-card {
-    display: flex;
-    flex-direction: column;
-    padding: 2.3cqw 2.1cqw 1.9cqw;
-  }
-
-  .notice-cream {
-    gap: 0.35em;
+    --bp: calc(100cqw / 1345);
   }
 
   .notice-title {
     font-family: var(--font-display);
     font-weight: 600;
-    font-size: max(16px, 2.45cqw);
-    line-height: 1.04;
-    letter-spacing: -0.01em;
+    font-size: calc(34 * var(--bp));
+    line-height: 1.02;
+    letter-spacing: -0.012em;
     font-variation-settings: "opsz" 72, "SOFT" 50;
-    margin-bottom: 0.3em;
+    text-wrap: balance;
   }
 
   .notice-hand {
     font-family: var(--font-hand);
-    font-size: max(15px, 2.05cqw);
+    font-size: calc(27 * var(--bp));
     font-weight: 500;
-    line-height: 1.08;
+    line-height: 1.12;
+  }
+
+  .notice-hours .notice-title {
+    margin-bottom: calc(14 * var(--bp));
+  }
+
+  .notice-hours .notice-hand + .notice-hand {
+    margin-top: calc(8 * var(--bp));
+  }
+
+  /* The note's corner: a float the words run around, pushed down to where the note begins. */
+  .notice-push {
+    float: right;
+    width: 0;
+    height: calc(var(--push) * var(--bp));
+  }
+
+  .notice-notch {
+    float: right;
+    clear: right;
+    width: calc(var(--notch) * var(--bp));
+    height: calc(400 * var(--bp));
+  }
+
+  .notice-whats-on .notice-title {
+    font-size: calc(32 * var(--bp));
+    margin-bottom: calc(12 * var(--bp));
   }
 
   .notice-list {
     display: grid;
-    gap: 0.2em;
+    gap: calc(7 * var(--bp));
   }
 
   .notice-list li {
     display: flex;
     align-items: baseline;
-    gap: 0.3em;
+    gap: calc(7 * var(--bp));
+  }
+
+  .notice-whats-on .notice-hand {
+    font-size: calc(23.5 * var(--bp));
+  }
+
+  /* Polish runs longer: the same card, a slightly smaller hand. */
+  .notice-whats-on:lang(pl) .notice-hand {
+    font-size: calc(21.5 * var(--bp));
+    line-height: 1.06;
   }
 
   .notice-tick {
     flex: none;
-    width: 0.9em;
-    height: 0.65em;
+    width: 0.8em;
+    height: 0.56em;
     color: var(--color-bark);
   }
 
   .notice-kraft {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    gap: 0.6em;
-    padding: 2.4cqw 2.2cqw;
+    gap: calc(14 * var(--bp));
     text-align: center;
-    font-size: max(13px, 1.45cqw);
-    line-height: 1.3;
+    font-size: calc(19.5 * var(--bp));
+    line-height: 1.32;
+    text-wrap: balance;
     color: var(--color-bark);
   }
 
@@ -570,7 +651,10 @@
     text-underline-offset: 0.2em;
   }
 
+  /* Pen drawings: coordinates and pen in board pixels. */
   .notice-sketch {
+    --pen: 2.2;
+    display: block;
     width: 100%;
     height: 100%;
     color: var(--color-bark);
@@ -581,22 +665,18 @@
   .sketch-line {
     fill: none;
     stroke: currentColor;
-    stroke-width: 1.6;
+    stroke-width: var(--pen, 1.6);
     stroke-linecap: round;
     stroke-linejoin: round;
     stroke-dasharray: 1;
     stroke-dashoffset: 1;
   }
 
-  /* Map words are HTML over the drawing, so they keep a readable size on a phone. */
   .map-label {
-    position: absolute;
     font-family: var(--font-hand);
-    font-size: max(14px, 1.6cqw);
+    font-size: 22px;
     font-weight: 500;
-    line-height: 1.05;
-    white-space: nowrap;
-    color: var(--color-bark);
+    fill: currentColor;
     opacity: 0;
   }
 
@@ -622,6 +702,59 @@
     }
   }
 
+  /* The scene's film over what the page paints of it: one grain per CSS px, a new frame of film
+     18 times a second (a jump of the tile, held), the colour times 1 ± a little. */
+  .film-grain {
+    position: absolute;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .film-grain:not([data-shown]),
+  .visit-panel:not([data-arrived]) .film-grain {
+    display: none;
+  }
+
+  .film-grain::before,
+  .film-grain::after {
+    content: "";
+    position: absolute;
+    inset: -256px;
+    background-size: 256px 256px;
+    animation: film-grain 1s steps(1, end) infinite;
+  }
+
+  .film-grain::before {
+    background-image: var(--grain-dark, none);
+    mix-blend-mode: multiply;
+  }
+
+  .film-grain::after {
+    background-image: var(--grain-light, none);
+    mix-blend-mode: color-dodge;
+  }
+
+  @keyframes film-grain {
+    0% { transform: translate3d(-165px, -77px, 0); }
+    5.556% { transform: translate3d(-202px, -24px, 0); }
+    11.111% { transform: translate3d(-37px, -48px, 0); }
+    16.667% { transform: translate3d(-187px, -29px, 0); }
+    22.222% { transform: translate3d(-109px, -19px, 0); }
+    27.778% { transform: translate3d(-44px, -222px, 0); }
+    33.333% { transform: translate3d(-214px, -35px, 0); }
+    38.889% { transform: translate3d(-123px, -46px, 0); }
+    44.444% { transform: translate3d(-217px, -30px, 0); }
+    50% { transform: translate3d(-63px, -114px, 0); }
+    55.556% { transform: translate3d(-31px, -203px, 0); }
+    61.111% { transform: translate3d(-25px, -113px, 0); }
+    66.667% { transform: translate3d(-23px, -68px, 0); }
+    72.222% { transform: translate3d(-148px, -214px, 0); }
+    77.778% { transform: translate3d(-73px, -60px, 0); }
+    83.333% { transform: translate3d(-157px, -92px, 0); }
+    88.889% { transform: translate3d(-52px, -96px, 0); }
+    94.444% { transform: translate3d(-190px, -49px, 0); }
+  }
+
   .visit-close {
     position: fixed;
     top: calc(var(--spacing-gutter) + 4rem);
@@ -645,15 +778,6 @@
 
   .visit-panel[data-arrived] .visit-close {
     opacity: 1;
-  }
-
-  /* Phones: the cards, not the whole cork, fill the width. */
-  @media (max-width: 639px) {
-    .notice-board {
-      --side: 8px;
-      --fit-x: 360;
-      --fit-w: 670;
-    }
   }
 
   /* Phones: at the bottom, under the thumb and out of the board's way. */
@@ -692,6 +816,11 @@
 
   .map-label {
     opacity: 1;
+    animation: none !important;
+  }
+
+  .film-grain::before,
+  .film-grain::after {
     animation: none !important;
   }
 

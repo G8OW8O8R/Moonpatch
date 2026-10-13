@@ -31,7 +31,7 @@ export const messagesSchema = z.strictObject({
     intro: text,
     tagline: text,
     wander: text,
-    pickDoor: text,
+    useSignpost: text,
     signpost: text,
     arms: z.strictObject({ cafe: text, barn: text, haunt: text }),
     board: text,

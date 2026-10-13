@@ -3,29 +3,55 @@
 import { type CSSProperties, type KeyboardEvent, useEffect, useRef } from "react";
 import { Icon } from "@/components/ui/Icon";
 import type { Messages } from "@/lib/messages";
-import { BOARD, BOARD_PARTS, OPENED_BOARD, OPENED_BOARD_AVIF } from "@/lib/square-props";
+import { BOARD_TEXT } from "@/lib/board-parts";
+import { openedBoardFile, openedBoardSrcSet } from "@/lib/square-poster";
+import { BOARD, BOARD_PARTS, openedBoardSizes } from "@/lib/square-props";
 import type { VisitCopy } from "@/lib/visit";
+import { FilmGrain } from "./FilmGrain";
 import { NoticeMap, PumpkinSketch } from "./sketches";
 
 type CardId = keyof typeof BOARD_PARTS.cards;
+type Box = { x: number; y: number; w: number; h: number };
 
 const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
 
 /** "10 am", "Oct 31", "31 października": a number never parts from its word at a line end. */
-const keepTogether = (text: string) =>
-  text.replace(/(d) (?=[a-zA-Ząćęłńóśźż])/g, "$1 ").replace(/([A-Za-z]{3}) (?=d)/g, "$1 ");
+const keepTogether = (text: string) => text.replace(/(\d) (?=[a-zA-Ząćęłńóśźż])/g, "$1 ").replace(/([A-Za-z]{3}) (?=\d)/g, "$1 ");
 
-/** A card's place on the board as shares of it, so it scales with the board. */
-const cardStyle = (id: CardId): CSSProperties => {
-  const c = BOARD_PARTS.cards[id];
+/** A box on the board as shares of it, turned with its card, so it scales with the board. */
+const boxStyle = (box: Box, card: CardId): CSSProperties => {
+  const { rotate } = BOARD_PARTS.cards[card];
   return {
-    left: `${(c.x / BOARD.width) * 100}%`,
-    top: `${(c.y / BOARD.height) * 100}%`,
-    width: `${(c.w / BOARD.width) * 100}%`,
-    height: `${(c.h / BOARD.height) * 100}%`,
-    transform: c.rotate ? `rotate(${c.rotate}deg)` : undefined,
+    left: `${(box.x / BOARD.width) * 100}%`,
+    top: `${(box.y / BOARD.height) * 100}%`,
+    width: `${(box.w / BOARD.width) * 100}%`,
+    height: `${(box.h / BOARD.height) * 100}%`,
+    transform: rotate ? `rotate(${rotate}deg)` : undefined,
   };
 };
+
+/** The corner the kraft note covers, kept clear by a float the words run around (board px, from the box's own corner). */
+const notchStyle = (box: (typeof BOARD_TEXT)["hours"]): CSSProperties =>
+  ({
+    "--push": box.notch.y - box.y,
+    "--notch": box.x + box.w - box.notch.x,
+  }) as CSSProperties;
+
+/** The opened board as the panel shows it, outside the page: for fetching and decoding it ahead of time. */
+export function openedBoardPicture(): HTMLImageElement {
+  const picture = document.createElement("picture");
+  const source = document.createElement("source");
+  source.type = "image/avif";
+  source.srcset = openedBoardSrcSet("avif");
+  source.sizes = openedBoardSizes();
+  const img = document.createElement("img");
+  img.srcset = openedBoardSrcSet("webp");
+  img.sizes = openedBoardSizes();
+  picture.append(source, img);
+  // Only once the sources are in place, or the browser would start on the fallback.
+  img.src = openedBoardFile(1160, "webp");
+  return img;
+}
 
 export interface VisitPanelProps {
   copy: VisitCopy;
@@ -92,13 +118,77 @@ export function VisitPanel({ copy, t, arrived, content, fade, painted, onClose }
     }
   };
 
+  const board = content && (
+    <div className="notice-board board-place absolute">
+      <picture>
+        <source type="image/avif" srcSet={openedBoardSrcSet("avif")} sizes={openedBoardSizes()} />
+        <img
+          src={openedBoardFile(1160, "webp")}
+          srcSet={openedBoardSrcSet("webp")}
+          sizes={openedBoardSizes()}
+          alt=""
+          width={BOARD.width}
+          height={BOARD.height}
+          fetchPriority={fade ? "auto" : "high"}
+          className={`absolute inset-0 size-full max-w-none ${painted ? "invisible" : ""}`}
+          draggable={false}
+        />
+      </picture>
+
+      <section data-card="hours" className="notice-card notice-hours absolute" style={boxStyle(BOARD_TEXT.hours, "hours")}>
+        <span aria-hidden="true" className="notice-push" style={notchStyle(BOARD_TEXT.hours)} />
+        <span aria-hidden="true" className="notice-notch" style={notchStyle(BOARD_TEXT.hours)} />
+        <h3 className="notice-title">{copy.hours.title}</h3>
+        {copy.hours.lines.map((line) => (
+          <p key={line} className="notice-hand">
+            {keepTogether(line)}
+          </p>
+        ))}
+      </section>
+
+      <section data-card="whatsOn" className="notice-card notice-whats-on absolute" style={boxStyle(BOARD_TEXT.whatsOn, "whatsOn")}>
+        <h3 className="notice-title">{copy.whatsOn.title}</h3>
+        <ul className="notice-list">
+          {copy.whatsOn.items.map((item) => (
+            <li key={item} className="notice-hand">
+              <svg aria-hidden="true" viewBox="0 0 20 14" className="notice-tick">
+                <path pathLength={1} className="sketch-line" d="M3 8 Q5 10 7 12 Q11 5 18 2" />
+              </svg>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <div
+        data-card="map"
+        className="notice-card notice-drawing absolute"
+        style={boxStyle(BOARD_PARTS.cards.map, "map")}
+        data-moon-slot={copy.moon.hiddenBehind === "map" ? copy.moon.id : undefined}
+      >
+        <NoticeMap labels={copy.map} title={t.map} />
+      </div>
+
+      <div data-card="drawings" className="notice-card notice-drawing absolute" style={boxStyle(BOARD_PARTS.cards.drawings, "drawings")}>
+        <PumpkinSketch title={t.drawings} />
+      </div>
+
+      <section data-card="note" className="notice-card notice-kraft absolute" style={boxStyle(BOARD_TEXT.note, "note")}>
+        <p>{copy.note.text}</p>
+        <a href={copy.note.href} className="notice-link" rel="noopener" target="_blank">
+          {copy.note.link}
+        </a>
+      </section>
+    </div>
+  );
+
   return (
     <div
       ref={dialog}
       role="dialog"
       aria-modal="true"
       aria-labelledby="visit-heading"
-      className="visit-panel fixed inset-0 z-20"
+      className="visit-panel absolute inset-0"
       data-arrived={arrived ? "" : undefined}
       data-fade={fade ? "" : undefined}
       onKeyDown={onKeyDown}
@@ -107,52 +197,8 @@ export function VisitPanel({ copy, t, arrived, content, fade, painted, onClose }
         {t.board}
       </h2>
 
-      {content && (
-        <div className="notice-board absolute">
-          <picture>
-            <source type="image/avif" srcSet={OPENED_BOARD_AVIF} />
-            <img src={OPENED_BOARD} alt="" className={`absolute inset-0 size-full ${painted ? "invisible" : ""}`} draggable={false} />
-          </picture>
-
-          <section className="notice-card notice-cream absolute" style={cardStyle("hours")}>
-            <h3 className="notice-title">{copy.hours.title}</h3>
-            {copy.hours.lines.map((line) => (
-              <p key={line} className="notice-hand">
-                {keepTogether(line)}
-              </p>
-            ))}
-          </section>
-
-          <section className="notice-card notice-cream absolute" style={cardStyle("whatsOn")}>
-            <h3 className="notice-title">{copy.whatsOn.title}</h3>
-            <ul className="notice-list">
-              {copy.whatsOn.items.map((item) => (
-                <li key={item} className="notice-hand">
-                  <svg aria-hidden="true" viewBox="0 0 20 14" className="notice-tick">
-                    <path pathLength={1} className="sketch-line" d="M2 8 Q5 10 7 12 Q11 5 18 2" />
-                  </svg>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <div className="notice-card absolute" style={cardStyle("map")} data-moon-slot={copy.moon.hiddenBehind === "map" ? copy.moon.id : undefined}>
-            <NoticeMap labels={copy.map} title={t.map} />
-          </div>
-
-          <div className="notice-card absolute" style={cardStyle("drawings")}>
-            <PumpkinSketch title={t.drawings} />
-          </div>
-
-          <section className="notice-card notice-kraft absolute" style={cardStyle("note")}>
-            <p>{copy.note.text}</p>
-            <a href={copy.note.href} className="notice-link" rel="noopener" target="_blank">
-              {copy.note.link}
-            </a>
-          </section>
-        </div>
-      )}
+      {board}
+      {content && <FilmGrain board={painted} />}
 
       <button ref={close} type="button" className="visit-close" onClick={onClose}>
         <Icon name="close" />

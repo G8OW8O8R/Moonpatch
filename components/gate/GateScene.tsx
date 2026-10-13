@@ -7,7 +7,7 @@ import { type RigParams, defaultRig } from "@/lib/gate-rig";
 import type { Locale } from "@/lib/i18n";
 import type { Messages } from "@/lib/messages";
 import { placeAt, placePath } from "@/lib/routes";
-import { type ArmId, OPENED_BOARD, OPENED_BOARD_AVIF } from "@/lib/square-props";
+import { type ArmId, propsOnScreen } from "@/lib/square-props";
 import { DUSK, type Track, defaultTrack, trackAt, trackEnd, trackLength } from "@/lib/square-rig";
 import { SPOT_KEY, readSpot, spotToKeep, startAt, writeSpot } from "@/lib/square-spot";
 import type { VisitCopy } from "@/lib/visit";
@@ -15,7 +15,9 @@ import { publishLenis } from "@/components/ui/lenis-channel";
 import { SquareDriver } from "@/components/square/driver";
 import { drawArmLabels } from "@/components/square/labels";
 import { SquareOverlay, type SquareOverlayHandle } from "@/components/square/SquareOverlay";
-import { VisitPanel } from "@/components/square/VisitPanel";
+import { VisitBackdrop, placeBackdrop } from "@/components/square/VisitBackdrop";
+import { VisitPanel, openedBoardPicture } from "@/components/square/VisitPanel";
+import { warmSquare } from "@/components/square/warm";
 import type { FrameStats } from "./renderer/GateRenderer";
 import { type SquareState, restingSquare } from "./renderer/SquareRenderer";
 import type { GateController } from "./renderer/start";
@@ -55,11 +57,41 @@ interface ScrollLock {
   destroy(): void;
 }
 
-const whenIdle = (task: () => void) => {
-  const run = () => ("requestIdleCallback" in window ? window.requestIdleCallback(task, { timeout: 1500 }) : setTimeout(task, 200));
+/**
+ * Runs `task` once the page has loaded and the browser is idle, `after` ms past the load at the
+ * earliest; the visitor's first touch, click or key brings it forward. Returns a cancel.
+ */
+const whenIdle = (task: () => void, after = 0): (() => void) => {
+  let done = false;
+  let timer = 0;
+  const once = () => {
+    if (done) return;
+    done = true;
+    stop();
+    task();
+  };
+  const idle = () => ("requestIdleCallback" in window ? window.requestIdleCallback(once, { timeout: 1500 }) : setTimeout(once, 200));
+  const run = () => (after ? (timer = window.setTimeout(idle, after)) : idle());
+  const early = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+  const stop = () => {
+    window.clearTimeout(timer);
+    window.removeEventListener("load", run);
+    for (const type of early) window.removeEventListener(type, once, true);
+  };
+  if (after) for (const type of early) window.addEventListener(type, once, { capture: true, passive: true });
   if (document.readyState === "complete") run();
   else window.addEventListener("load", run, { once: true });
+  return () => {
+    done = true;
+    stop();
+  };
 };
+
+/**
+ * Opened on the board's address, the board is all there is to see: the page shows it on its own
+ * first, and the scene (and the square's own pictures) come this long after the page has loaded.
+ */
+const BOARD_SCENE_DELAY = 2500;
 
 /** Development only: ?layer=gate|plate holds one renderer, for frame-by-frame comparison. */
 const debugLayer = (): { debugLayer?: "gate" | "plate" } => {
@@ -69,6 +101,12 @@ const debugLayer = (): { debugLayer?: "gate" | "plate" } => {
 };
 
 const prefersReduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Canvases already handed to a scene. A canvas gives its control away once; one that is still in
+ * the page when the scene starts again (a hot reload, a component shown again) is swapped for a new one.
+ */
+const startedCanvases = new WeakSet<HTMLCanvasElement>();
 
 /** Set once a scene has left the page for another place on the farm: coming back to one is a return. */
 let sceneLeft = false;
@@ -111,6 +149,7 @@ export function GateScene({
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const overlay = useRef<SquareOverlayHandle>(null);
+  const backdrop = useRef<HTMLImageElement>(null);
   const controller = useRef<GateController | null>(null);
   const driver = useRef<SquareDriver | null>(null);
   const progress = useRef(0);
@@ -122,7 +161,7 @@ export function GateScene({
    * The page started on the square: it is simply there, a cut, with no fade
    * over the gate poster beneath. Lasts until the visitor first scrolls.
    */
-  const [cut, setCut] = useState(false);
+  const [cut, setCut] = useState(initialView === "visit");
   /** The scene has its first frame; it is shown once it can draw the square, if that is where the page is. */
   const engineReady = useRef(false);
   const paramsRef = useRef(params);
@@ -153,6 +192,8 @@ export function GateScene({
    */
   const boardWarmed = useRef(false);
   const boardImage = useRef<HTMLImageElement | null>(null);
+  /** The signpost's lettering, for readying the plain-HTML square. */
+  const signpost = useRef({ labels: square.t.arms, lang: square.lang });
 
   const pathname = usePathname();
   const boardOpen = placeAt(pathname ?? "")?.place === "visit";
@@ -190,19 +231,15 @@ export function GateScene({
     d.showProps(onSquare || boardOpenRef.current, jump);
     // The scene paints the opened board itself; only the plain-HTML square needs its image.
     if (onSquare && !webgl && !boardImage.current) {
-      // Through a <picture> like the panel's, so the browser picks the same file.
-      const picture = document.createElement("picture");
-      const source = document.createElement("source");
-      source.type = "image/avif";
-      source.srcset = OPENED_BOARD_AVIF;
-      const img = document.createElement("img");
-      picture.append(source, img);
-      // Only once the source is in place, or the browser would start on the fallback.
-      img.src = OPENED_BOARD;
+      const img = openedBoardPicture();
       void img.decode().catch(() => undefined);
       boardImage.current = img;
     }
-    if (onSquare && !boardWarmed.current) {
+    // The square as plain HTML, ready for any way back onto it.
+    // Out on the square (not behind a board opened on its own address, which readies them later).
+    const out = onSquare && !boardOpenRef.current;
+    if (out) warmSquare(signpost.current);
+    if (out && !boardWarmed.current) {
       boardWarmed.current = true;
       // The board's lettering, so its first layout never waits on a font.
       const css = getComputedStyle(document.documentElement);
@@ -271,7 +308,14 @@ export function GateScene({
         if (webgl) controller.current?.setSquare(state);
         const el = stage.current;
         // Before the scene is ready this layer stands in for it, framed as it will be; the fallback holds still.
-        if (el) overlay.current?.update(state, { width: el.clientWidth, height: el.clientHeight }, webgl, modeRef.current !== "fallback");
+        const size = el && { width: el.clientWidth, height: el.clientHeight };
+        const plate = size && overlay.current?.update(state, size, webgl, modeRef.current !== "fallback");
+        // Arrived on the board's address it stands where the camera rests on the board from the very first
+        // frame; opened from the square, it comes in with the camera.
+        if (size && plate && backdrop.current) {
+          if (openedHere.current) placeBackdrop(backdrop.current, plate, state.visit);
+          else placeBackdrop(backdrop.current, propsOnScreen(size, { dusk: 1, wander: 1, visit: 1 }, { pan: false }).plate, 1);
+        }
         // Paper type once the sky has darkened, and over the opened board.
         const header = state.dusk >= DUSK.header || state.visit > 0 ? "paper" : "ink";
         if (section.current && section.current.dataset.header !== header) section.current.dataset.header = header;
@@ -441,10 +485,19 @@ export function GateScene({
       controller.current?.resize({ width: stageEl.clientWidth, height: stageEl.clientHeight });
     });
 
-    whenIdle(() => {
+    const onBoard = initialView === "visit" && boardOpenRef.current;
+    const cancelStart = whenIdle(() => {
       if (cancelled) return;
+      if (onBoard) warmSquare(signpost.current);
+      // Opened on the board, the gate's poster has waited until now; the scene starts from it.
+      if (poster.loading === "lazy") poster.loading = "eager";
       void import("./renderer/start").then(({ startGate }) => {
         if (cancelled) return;
+        if (startedCanvases.has(canvasEl)) {
+          setRestart((n) => n + 1);
+          return;
+        }
+        startedCanvases.add(canvasEl);
         squareReady.current = false;
         engineReady.current = false;
         controller.current = startGate(
@@ -499,17 +552,18 @@ export function GateScene({
         resize.observe(stageEl);
         document.addEventListener("visibilitychange", onVisibility);
       });
-    });
+    }, onBoard ? BOARD_SCENE_DELAY : 0);
 
     return () => {
       cancelled = true;
+      cancelStart();
       intersection.disconnect();
       resize.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang]);
+  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang, initialView]);
 
   // A fresh frame once the canvas is shown; without the scene nothing may hold the page.
   useEffect(() => {
@@ -560,12 +614,15 @@ export function GateScene({
             lang={square.lang}
             t={square.t}
             paints={htmlSquare}
+            plates={!boardOpen || openedInPage}
+            first={cut}
             boardOpen={boardOpen}
             onPointArm={pointArm}
             onPointBoard={pointBoard}
             onOpenBoard={openBoard}
           />
         </div>
+        {boardOpen && <VisitBackdrop ref={backdrop} painted={canvasShown} />}
         {boardOpen && (
           <VisitPanel
             copy={square.board}

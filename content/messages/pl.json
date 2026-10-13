@@ -22,7 +22,7 @@
     "intro": "Czerwona stodoła, kremowa kawiarnia i grafitowy sklep ze straszydłami stoją wokół placu pełnego dyń. Przewijaj dalej, a zapadnie zmierzch: girlandy zapalą się żarówka po żarówce.",
     "tagline": "Wybierz drzwi. Zostań na dłużej.",
     "wander": "Przewiń, żeby się rozejrzeć",
-    "pickDoor": "Wybierz drzwi",
+    "useSignpost": "Skorzystaj z drogowskazu",
     "signpost": "Drogowskaz",
     "arms": {
       "cafe": "Kawiarnia",
