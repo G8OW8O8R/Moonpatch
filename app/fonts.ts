@@ -17,7 +17,7 @@ export const instrumentSans = Instrument_Sans({
   display: "swap",
 });
 
-/** Hand-lettered accents: ingredients, the signpost, notes on the board. */
+/** Hand-lettered accents: ingredients and notes on the board. */
 export const caveat = Caveat({
   subsets: ["latin", "latin-ext"],
   variable: "--font-caveat",

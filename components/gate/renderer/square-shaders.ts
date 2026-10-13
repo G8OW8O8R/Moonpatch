@@ -78,33 +78,108 @@ void main() {
 `;
 
 /**
- * A prop: a premultiplied cut-out in the light of the scene. Arms carry a
- * label painted on the wood: the ink takes the grain beneath it, so it reads
- * as paint rather than print.
+ * A prop in the light of the photograph. Its colour is the cut-out's own,
+ * lit the way the plate is lit: the photograph's warm golden light at first,
+ * then dusk's, lower and bluer, along the plate's own grade curve and with
+ * its cooling on the way. Lamplight from the
+ * strings and windows nearby lies warm across its face and on the edges that
+ * face it; the board's lantern lights the wood around it and glows in its
+ * glass. A touch of the surrounding air lies over all of it. Labels are paint
+ * multiplied into the wood, gone where the grain runs deep.
  */
 export const propFragment = /* glsl */ `${header}
+${screenPixel}
 in vec2 vUv;
 uniform sampler2D uTexture;
 uniform sampler2D uLabel;
+uniform sampler2D uGolden;
+uniform sampler2D uBase;
 uniform float uHasLabel;
-uniform vec3 uInk;
-uniform vec3 uTint;
+uniform vec3 uPaint;        // multiplied into the surface where the label covers it
+uniform float uWear;        // 1: paint on weathered wood, lost in the grain
+uniform float uLabelAmount; // how much of the label shows
+uniform vec2 uOrigin;       // this prop's window, device px
+uniform float uScale;
+uniform vec2 uPlate;
+uniform float uAirLod;
+uniform vec3 uKey;          // golden-hour light on the props
+uniform vec3 uDusk;         // what dusk does to it
+uniform float uGrade;
+uniform float uCool;
+uniform vec3 uOpenTint;     // the lantern-lit board up close
+uniform float uOpen;
+uniform vec3 uWarm;         // lamplight colour × strength
+uniform vec2 uWarmDir;      // towards the light, image uv
+uniform vec2 uRimStep;      // a rim's width towards the light, image uv
+uniform float uRamp;
+uniform float uRim;
+uniform float uHover;
+uniform float uHoverLift;
+uniform vec3 uHoverWarm;
+uniform float uLantern;     // 0 off … 1 lit, flicker included
+uniform vec2 uLanternAt;    // image uv
+uniform vec2 uImage;        // image size, px
+uniform float uLanternReach;
+uniform float uLanternAmount;
+uniform float uGlass;
+uniform float uGlassGlow;
+uniform vec3 uFlame;
+uniform float uHaze;
 uniform float uAlpha;
 out vec4 outColour;
+
+const vec3 LUMA = vec3(0.299, 0.587, 0.114);
+
 void main() {
-  vec4 c = texture(uTexture, vUv);
-  if (uHasLabel > 0.0) {
-    float paint = texture(uLabel, vUv).a * 0.92;
-    vec3 wood = c.a > 0.0 ? c.rgb / c.a : vec3(0.0);
-    float grain = dot(wood, vec3(0.299, 0.587, 0.114));
-    vec3 ink = uInk * (0.7 + 0.45 * grain);
-    c.rgb = mix(c.rgb, ink * c.a, paint * c.a);
+  vec4 c = texture(uTexture, vUv, 0.35);
+  if (c.a < 0.001) {
+    outColour = vec4(0.0);
+    return;
   }
-  outColour = vec4(c.rgb * uTint, c.a) * uAlpha;
+  vec3 albedo = c.rgb / c.a;
+
+  if (uHasLabel > 0.0) {
+    float cover = texture(uLabel, vUv, 0.6).a * uLabelAmount;
+    if (uWear > 0.0) {
+      // Paint keeps to the face of the boards and is gone from the dark of the grain.
+      vec4 around = textureLod(uTexture, vUv, 3.5);
+      float local = dot(around.rgb / max(around.a, 0.001), LUMA);
+      float groove = (local - dot(albedo, LUMA)) * 5.0;
+      cover *= (1.0 - smoothstep(0.04, 0.32, groove)) * 0.9;
+    }
+    albedo = mix(albedo, albedo * uPaint, cover);
+  }
+
+  vec3 light = uKey * mix(vec3(1.0), uDusk, uGrade);
+  float bump = 4.0 * uGrade * (1.0 - uGrade) * uCool;
+  light *= vec3(1.0 - 0.06 * bump, 1.0 - 0.03 * bump, 1.0 + 0.03 * bump);
+  light = mix(light, uOpenTint, uOpen);
+  vec3 colour = albedo * light;
+
+  // Lamplight: a little across the face, more on the edges turned to it.
+  float ramp = clamp(0.5 + dot(vUv - 0.5, uWarmDir) * 1.2, 0.0, 1.0);
+  float rim = c.a * (1.0 - texture(uTexture, vUv + uRimStep, 1.0).a);
+  vec3 warm = uWarm * (uRamp * ramp + uRim * rim) * (1.0 - uOpen);
+  warm += uHoverWarm * uHover * (0.4 + 0.6 * ramp);
+  colour += albedo * warm;
+  colour *= 1.0 + uHoverLift * uHover;
+
+  if (uLantern > 0.0) {
+    float d = length((vUv - uLanternAt) * uImage);
+    colour += albedo * uFlame * (uLantern * uLanternAmount / (1.0 + (d / uLanternReach) * (d / uLanternReach)));
+    float t = clamp((uGlass - d) / (uGlass * 0.45), 0.0, 1.0);
+    colour += uFlame * (uLantern * uGlassGlow * t * t * (3.0 - 2.0 * t));
+  }
+
+  vec2 plate = (screenPixel() - uOrigin) / uScale;
+  vec2 puv = clamp(plate / uPlate, vec2(0.0), vec2(1.0));
+  vec3 air = mix(textureLod(uGolden, puv, uAirLod).rgb, textureLod(uBase, puv, uAirLod).rgb, uGrade);
+  colour = mix(colour, air, uHaze * (1.0 - uOpen));
+  outColour = vec4(colour * c.a, c.a) * uAlpha;
 }
 `;
 
-/** Contact shadow: a soft ellipse, multiplied into what lies beneath. */
+/** Contact shadow at a foot: a soft ellipse, multiplied into what lies beneath. */
 export const contactFragment = /* glsl */ `${header}
 in vec2 vUv;
 uniform float uStrength;
@@ -117,15 +192,20 @@ void main() {
 }
 `;
 
-/** A warm glow added around a flame. */
-export const glowFragment = /* glsl */ `${header}
+/**
+ * A prop's own silhouette laid on the ground behind it: sharp at its foot,
+ * softer and fainter the further it falls, multiplied into the road.
+ */
+export const castFragment = /* glsl */ `${header}
 in vec2 vUv;
+uniform sampler2D uTexture;
 uniform float uStrength;
 out vec4 outColour;
 void main() {
-  float d = length(vUv * 2.0 - 1.0);
-  float k = uStrength * exp(-d * d * 4.0) * (1.0 - smoothstep(0.85, 1.0, d));
-  outColour = vec4(vec3(1.0, 0.66, 0.32) * k, 0.0);
+  float away = 1.0 - vUv.y;
+  float a = texture(uTexture, vUv, 1.0 + away * 4.0).a;
+  float k = uStrength * a * pow(1.0 - away, 1.4);
+  outColour = vec4(k * vec3(1.0, 0.92, 0.84), 1.0);
 }
 `;
 

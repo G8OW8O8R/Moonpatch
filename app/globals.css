@@ -256,6 +256,34 @@
     transition: none;
   }
 
+  .prop-golden {
+    filter: url(#props-golden);
+  }
+
+  /* The props in the light at the end of dusk, baked, laid over them with the dusk plate. */
+  .prop-dusk {
+    opacity: 0;
+    transition: opacity var(--duration-scene-long) var(--ease-in-out);
+  }
+
+  .square-overlay[data-dusk] .prop-dusk {
+    opacity: 1;
+  }
+
+  .scene-stage[data-cut] .square-overlay .prop-dusk {
+    opacity: var(--grade, 0);
+    transition: none;
+  }
+
+  /* One still frame of film over the plain-HTML square. */
+  .square-grain {
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='192' height='192'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0.33 0.33 0.33 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+    background-size: 192px 192px;
+    mix-blend-mode: overlay;
+    opacity: 0.16;
+  }
+
   /* At dusk, the golden plate never shows through a dusk plate still on its way. */
   .scene-stage[data-cut] .square-overlay[data-dusk] .square-plates img:not(.square-dusk) {
     visibility: hidden;
@@ -265,17 +293,22 @@
     opacity: var(--props, 0);
   }
 
-  .square-overlay[data-dusk]:not([data-webgl]) .square-props :is(img, .arm-label) {
-    filter: url(#props-dusk);
-  }
-
   .square-props :is(a, button) {
     pointer-events: auto;
     cursor: pointer;
   }
 
-  .square-props :is(a, button, img) {
+  .square-props :is(a, button, .sign-post) {
     will-change: transform;
+  }
+
+  /* Plain-HTML square: a prop pointed at is a touch brighter, as the scene lights it. */
+  .square-overlay:not([data-webgl]) :is(.sign-arm, .board-button):is(:hover, :focus-visible) .prop-golden {
+    filter: url(#props-golden) brightness(1.07) sepia(0.06);
+  }
+
+  .square-overlay:not([data-webgl]) :is(.sign-arm, .board-button):is(:hover, :focus-visible) .prop-dusk {
+    filter: brightness(1.07) sepia(0.06);
   }
 
   .contact-shadow {
@@ -290,24 +323,35 @@
     border-radius: var(--radius-sm);
   }
 
-  /* Painted onto the board: ink that takes the wood beneath it, no outline. */
+  /* Sign paint on the board: capitals multiplied into the wood, worn off with its grain
+     (the arm's own image is the mask), no outline. Padded to the painted face. */
   .arm-label {
     position: absolute;
-    inset: 10% 15% 10% 11%;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: var(--font-hand);
+    padding: 10cqh 15cqw 10cqh 11cqw;
+    font-family: var(--font-display);
     font-weight: 600;
+    font-variation-settings: "SOFT" 100, "opsz" 144;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
     line-height: 1;
     white-space: nowrap;
-    color: var(--color-ink);
-    opacity: 0.92;
+    color: rgb(79 64 54);
+    opacity: 0.9;
     mix-blend-mode: multiply;
+    mask-size: 100% 100%;
+    mask-mode: luminance;
   }
 
   .sign-arm[data-points="right"] .arm-label {
-    inset: 10% 14% 10% 12%;
+    padding: 10cqh 14cqw 10cqh 12cqw;
+  }
+
+  .board-writing {
+    mix-blend-mode: multiply;
   }
 
   .board-button {
@@ -330,8 +374,8 @@
     font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 0;
     text-wrap: balance;
     text-shadow:
-      0 0 2px rgb(43 33 28 / 0.55),
-      0 1px 12px rgb(43 33 28 / 0.45);
+      0 0 1px rgb(43 33 28 / 0.6),
+      0 1px 2px rgb(43 33 28 / 0.45);
     opacity: 0;
     transform: translate3d(0, 0.5rem, 0);
     transition:
@@ -345,8 +389,8 @@
     font-size: var(--text-ui);
     font-weight: 500;
     text-shadow:
-      0 0 2px rgb(43 33 28 / 0.6),
-      0 1px 8px rgb(43 33 28 / 0.4);
+      0 0 1px rgb(43 33 28 / 0.7),
+      0 1px 2px rgb(43 33 28 / 0.55);
     opacity: 0;
     transition: opacity var(--duration-panel) var(--ease-out) 0.3s;
   }
@@ -460,42 +504,6 @@
   .visit-panel[data-arrived][data-fade] .notice-board {
     @starting-style {
       opacity: 0;
-    }
-  }
-
-  .notice-lantern {
-    aspect-ratio: 1;
-    translate: -50% -50%;
-    border-radius: 50%;
-    background: radial-gradient(closest-side, rgb(255 206 140 / 0.9), rgb(255 166 84 / 0.42) 36%, rgb(255 150 70 / 0.16) 66%, transparent);
-    mix-blend-mode: screen;
-    animation: lantern 3.4s linear infinite;
-  }
-
-  @keyframes lantern {
-    0% {
-      opacity: 0.9;
-    }
-    11% {
-      opacity: 1;
-    }
-    19% {
-      opacity: 0.84;
-    }
-    33% {
-      opacity: 0.97;
-    }
-    47% {
-      opacity: 0.9;
-    }
-    62% {
-      opacity: 1;
-    }
-    78% {
-      opacity: 0.86;
-    }
-    100% {
-      opacity: 0.9;
     }
   }
 
@@ -671,8 +679,8 @@
     color: var(--color-paper);
     font-weight: 500;
     text-shadow:
-      0 0 2px rgb(43 33 28 / 0.7),
-      0 1px 8px rgb(43 33 28 / 0.5);
+      0 0 1px rgb(43 33 28 / 0.75),
+      0 1px 2px rgb(43 33 28 / 0.6);
   }
 }
 
@@ -685,10 +693,6 @@
   .map-label {
     opacity: 1;
     animation: none !important;
-  }
-
-  .notice-lantern {
-    animation: none;
   }
 
   .tagline {

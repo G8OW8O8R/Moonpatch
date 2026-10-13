@@ -16,7 +16,12 @@
  *   props         the signpost and the notice board from public/layers,
  *                 as WebP with alpha, at their own size; board-open is the
  *                 board in the warm light it has once opened (PROP_TINT.open
- *                 in lib/square-props), so the page never filters it.
+ *                 in lib/square-props) with its lantern alight, so the page
+ *                 never filters it.
+ *   *-dusk        each prop in the light at the very end of dusk, for the
+ *                 square without WebGL: the light the scene gives it then
+ *                 (lib/prop-light), baked.
+ *   board-writing faint pencil on the board's cards, seen from the square.
  *
  * Fading golden → dusk-base only changes colour, never grain; each light then
  * switches on by itself. The manifest lists every light with the moment it
@@ -27,6 +32,8 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp, { type Sharp } from "sharp";
+import { BOARD, BOARD_PARTS } from "../lib/board-parts.ts";
+import { LANTERN, PROP_LIGHT, WARM, lanternFalloff, lanternGlass, warmLight } from "../lib/prop-light.ts";
 
 const root = process.cwd();
 const outDir = join(root, "public", "img", "square");
@@ -392,26 +399,280 @@ const PROPS: Record<string, string> = {
   board: "noticeboard",
 };
 
-/** Light on the opened board; the same numbers as PROP_TINT.open, which the scene uses for its own copy. */
+/** Light on the opened board; the same numbers as PROP_TINT.open in lib/square-props, which the scene uses. */
 const OPEN_TINT = [1.0, 0.93, 0.84];
 
+/** Pencil on the cards: the same colour the scene multiplies in. */
+const PENCIL = [128, 120, 120];
+
+interface PropImage {
+  data: Buffer;
+  width: number;
+  height: number;
+}
+
+async function loadProp(source: string): Promise<PropImage> {
+  const { data, info } = await sharp(join(root, "public", "layers", `${source}.png`))
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  return { data, width: info.width, height: info.height };
+}
+
+interface PropLight {
+  /** Light on the albedo, per channel. */
+  key: number[];
+  /** Lamplight from the scene's lights: strength and where it comes from. */
+  warm: { strength: number; dir: { x: number; y: number } };
+  /** Width of a rim towards that light, image px. */
+  rim: number;
+  /** The board's lantern, 0–1. */
+  lantern: number;
+  /** The air between the prop and the camera. */
+  air: number[];
+  haze: number;
+}
+
+/** A prop lit as the scene lights it (lib/prop-light, the props shader), unpremultiplied RGBA out. */
+function lightProp(image: PropImage, light: PropLight): Buffer {
+  const { data, width, height } = image;
+  const out = Buffer.alloc(data.length);
+  const alphaAt = (x: number, y: number) => {
+    const cx = Math.min(width - 1, Math.max(0, Math.round(x)));
+    const cy = Math.min(height - 1, Math.max(0, Math.round(y)));
+    return data[(cy * width + cx) * 4 + 3]! / 255;
+  };
+  const warm = WARM.map((c) => c * light.warm.strength * PROP_LIGHT.warm);
+  const lantern = { x: BOARD_PARTS.lantern.x, y: BOARD_PARTS.lantern.y };
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const a = data[i + 3]! / 255;
+      out[i + 3] = data[i + 3]!;
+      if (a === 0) continue;
+      const u = x / width - 0.5;
+      const v = y / height - 0.5;
+      const ramp = Math.min(1, Math.max(0, 0.5 + (u * light.warm.dir.x + v * light.warm.dir.y) * 1.2));
+      const rim = a * (1 - alphaAt(x + light.warm.dir.x * light.rim, y + light.warm.dir.y * light.rim));
+      const d = Math.hypot(x - lantern.x, y - lantern.y);
+      const falloff = lanternFalloff(d) * LANTERN.amount * light.lantern;
+      const glass = lanternGlass(d) * LANTERN.glow * light.lantern;
+      for (let c = 0; c < 3; c++) {
+        const albedo = data[i + c]! / 255;
+        let colour = albedo * light.key[c]!;
+        colour += albedo * warm[c]! * (PROP_LIGHT.ramp * ramp + PROP_LIGHT.rim * rim);
+        colour += albedo * LANTERN.flame[c]! * falloff + LANTERN.flame[c]! * glass;
+        colour += (light.air[c]! - colour) * light.haze;
+        out[i + c] = Math.round(Math.min(1, Math.max(0, colour)) * 255);
+      }
+    }
+  return out;
+}
+
+const encodeProp = (image: Sharp, name: string) =>
+  image.webp({ quality: 86, alphaQuality: 100, effort: 6, smartSubsample: true }).toFile(join(outDir, `${name}.webp`));
+
 async function writeProps() {
-  const encode = (image: Sharp, name: string) =>
-    image.webp({ quality: 86, alphaQuality: 100, effort: 6, smartSubsample: true }).toFile(join(outDir, `${name}.webp`));
+  const encode = encodeProp;
   for (const [name, source] of Object.entries(PROPS)) {
     const info = await encode(sharp(join(root, "public", "layers", `${source}.png`)), name);
     console.log(`${name}.webp  ${info.width}×${info.height}  ${Math.round(info.size / 1024)} KB`);
   }
-  const board = sharp(join(root, "public", "layers", "noticeboard.png")).recomb([
-    [OPEN_TINT[0]!, 0, 0],
-    [0, OPEN_TINT[1]!, 0],
-    [0, 0, OPEN_TINT[2]!],
-  ]);
+  // Up close the board stands in its lantern's light alone, the lantern burning steady.
+  const source = await loadProp("noticeboard");
+  const opened = lightProp(source, {
+    key: OPEN_TINT,
+    warm: { strength: 0, dir: { x: 0, y: -1 } },
+    rim: 0,
+    lantern: 1,
+    air: [0, 0, 0],
+    haze: 0,
+  });
+  const board = sharp(opened, { raw: { width: source.width, height: source.height, channels: 4 } });
   const info = await encode(board.clone(), "board-open");
   console.log(`board-open.webp  ${info.width}×${info.height}  ${Math.round(info.size / 1024)} KB`);
   // The page shows it first thing on the board's own address: AVIF where the browser takes it.
   const avif = await board.avif({ quality: 52, effort: 6, chromaSubsampling: "4:4:4" }).toFile(join(outDir, "board-open.avif"));
   console.log(`board-open.avif  ${avif.width}×${avif.height}  ${Math.round(avif.size / 1024)} KB`);
+}
+
+// ------------------------------------------------------------ board writing
+
+function seeded(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+type CardBox = { x: number; y: number; w: number; h: number };
+
+/**
+ * Pencil on the cards as seen from across the square: lines of handwriting,
+ * headings, ticks, a road on the map, pumpkins on the sketch sheet. Never
+ * words; the cards up close carry the real ones.
+ */
+function boardWriting(): string {
+  const random = seeded(31);
+  const f = (n: number) => n.toFixed(1);
+  /** A line of joined-up hand from x0 to x1: humps for letters, a tall one now and then, gaps for spaces. */
+  const hand = (x0: number, x1: number, y: number, xh: number, width: number) => {
+    let x = x0;
+    let d = `M${f(x)} ${f(y)}`;
+    while (x < x1 - xh) {
+      const letters = 2 + Math.floor(random() * 6);
+      for (let k = 0; k < letters && x < x1; k++) {
+        const w = xh * (0.42 + random() * 0.32);
+        const tall = random() < 0.16 ? 1.8 : 1;
+        const up = xh * (0.75 + random() * 0.4) * tall;
+        d += ` c${f(w * 0.05)} ${f(-up * 1.33)} ${f(w * 0.95)} ${f(-up * 1.33)} ${f(w)} 0`;
+        if (random() < 0.08) {
+          // A descender.
+          d += ` q${f(w * 0.2)} ${f(xh * 1.8)} ${f(w * 0.35)} 0`;
+          x += w * 0.35;
+        }
+        x += w;
+      }
+      x += xh * (0.55 + random() * 0.5);
+      d += ` M${f(x)} ${f(y + (random() - 0.5) * 2)}`;
+    }
+    return `<path d="${d}" stroke-width="${width}"/>`;
+  };
+  const card = (id: keyof typeof BOARD_PARTS.cards, body: (c: CardBox) => string) => {
+    const c = BOARD_PARTS.cards[id];
+    return `<g transform="rotate(${c.rotate} ${f(c.x + c.w / 2)} ${f(c.y + c.h / 2)})">${body(c)}</g>`;
+  };
+  const lines = (c: CardBox, from: number, count: number, gap: number, xh: number) =>
+    Array.from({ length: count }, (_, i) => {
+      const x0 = c.x + c.w * 0.12;
+      const span = c.w * 0.76 * (0.55 + random() * 0.45);
+      return hand(x0, x0 + span, c.y + c.h * (from + i * gap), xh, 2.4);
+    }).join("");
+  const title = (c: CardBox, y: number, share: number) => hand(c.x + c.w * 0.12, c.x + c.w * (0.12 + share), c.y + c.h * y, 19, 4.6);
+
+  const parts = [
+    card("hours", (c) => title(c, 0.15, 0.62) + lines(c, 0.3, 7, 0.085, 11)),
+    card(
+      "whatsOn",
+      (c) =>
+        title(c, 0.16, 0.66) +
+        Array.from({ length: 4 }, (_, i) => {
+          const y = c.y + c.h * (0.33 + i * 0.15);
+          const x = c.x + c.w * 0.12;
+          return `<path d="M${f(x)} ${f(y - 4)} l4 5 l9 -12" stroke-width="2.4"/>` + hand(x + 20, x + 20 + c.w * (0.4 + random() * 0.3), y, 11, 2.4);
+        }).join(""),
+    ),
+    card(
+      "note",
+      (c) =>
+        Array.from({ length: 5 }, (_, i) => {
+          const span = c.w * (0.5 + random() * 0.25);
+          const x0 = c.x + (c.w - span) / 2;
+          return hand(x0, x0 + span, c.y + c.h * (0.28 + i * 0.1), 10, 2.2);
+        }).join("") +
+        `<path d="M${f(c.x + c.w * 0.3)} ${f(c.y + c.h * 0.84)} h${f(c.w * 0.4)}" stroke-width="2.2"/>` +
+        hand(c.x + c.w * 0.3, c.x + c.w * 0.7, c.y + c.h * 0.8, 10, 2.6),
+    ),
+    card("map", (c) => {
+      const p = (u: number, v: number) => `${f(c.x + c.w * u)} ${f(c.y + c.h * v)}`;
+      return (
+        `<path d="M${p(0.1, 0.85)} C${p(0.35, 0.75)} ${p(0.25, 0.45)} ${p(0.5, 0.42)} S${p(0.7, 0.2)} ${p(0.9, 0.15)}" stroke-width="3.2"/>` +
+        `<path d="M${p(0.14, 0.9)} C${p(0.4, 0.8)} ${p(0.3, 0.5)} ${p(0.55, 0.47)} S${p(0.74, 0.25)} ${p(0.93, 0.2)}" stroke-width="2"/>` +
+        `<rect x="${f(c.x + c.w * 0.6)}" y="${f(c.y + c.h * 0.5)}" width="${f(c.w * 0.12)}" height="${f(c.h * 0.08)}" stroke-width="2.4"/>` +
+        `<path d="M${p(0.25, 0.25)} m-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0" stroke-width="2.4"/>` +
+        hand(c.x + c.w * 0.12, c.x + c.w * 0.62, c.y + c.h * 0.1, 13, 3.4) +
+        hand(c.x + c.w * 0.62, c.x + c.w * 0.88, c.y + c.h * 0.66, 9, 2) +
+        hand(c.x + c.w * 0.3, c.x + c.w * 0.5, c.y + c.h * 0.3, 9, 2)
+      );
+    }),
+    card("drawings", (c) =>
+      (
+        [
+          [0.3, 0.38, 0.17],
+          [0.68, 0.42, 0.13],
+          [0.48, 0.72, 0.2],
+        ] as const
+      )
+        .map(([u, v, r]) => {
+          const cx = c.x + c.w * u;
+          const cy = c.y + c.h * v;
+          const rx = c.w * r;
+          const ry = rx * 0.78;
+          return (
+            `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" stroke-width="2.6"/>` +
+            `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx * 0.45)}" ry="${f(ry)}" stroke-width="2"/>` +
+            `<path d="M${f(cx)} ${f(cy - ry)} q2 -14 9 -18" stroke-width="2.6"/>`
+          );
+        })
+        .join(""),
+    ),
+  ];
+  const [r, g, b] = PENCIL;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${BOARD.width}" height="${BOARD.height}" viewBox="0 0 ${BOARD.width} ${BOARD.height}">` +
+    `<g fill="none" stroke="rgb(${r},${g},${b})" stroke-linecap="round" stroke-linejoin="round">${parts.join("")}</g></svg>`
+  );
+}
+
+async function writeBoardWriting() {
+  const info = await sharp(Buffer.from(boardWriting()))
+    .webp({ quality: 90, alphaQuality: 90, effort: 6 })
+    .toFile(join(outDir, "board-writing.webp"));
+  console.log(`board-writing.webp  ${info.width}×${info.height}  ${Math.round(info.size / 1024)} KB`);
+}
+
+// --------------------------------------------------------- props at dusk
+
+/**
+ * Where each prop stands on a 1536×864 screen (lib/square-props), in plate
+ * px, with how many CSS px one pixel of its image covers there. Their light
+ * is read from the plate around them; other screens differ by too little to
+ * matter for light this broad.
+ */
+const STANDING: Record<string, { source: string; box: Rect; cssPerPixel: number }> = {
+  post: { source: "sign-post", box: { x0: 2011, y0: 924, x1: 2115, y1: 1332 }, cssPerPixel: 0.267 },
+  "arm-cafe": { source: "sign-arm-cafe", box: { x0: 1812, y0: 969, x1: 2112, y1: 1041 }, cssPerPixel: 0.152 },
+  "arm-barn": { source: "sign-arm-barn", box: { x0: 1812, y0: 1049, x1: 2112, y1: 1121 }, cssPerPixel: 0.152 },
+  "arm-haunt": { source: "sign-arm-haunt", box: { x0: 2014, y0: 1129, x1: 2314, y1: 1201 }, cssPerPixel: 0.152 },
+  board: { source: "noticeboard", box: { x0: 703, y0: 670, x1: 957, y1: 1090 }, cssPerPixel: 0.127 },
+};
+
+function meanRgb(plane: Plane, box: Rect): number[] {
+  const sum = [0, 0, 0];
+  let n = 0;
+  for (let y = Math.max(0, box.y0); y < Math.min(H, box.y1); y++)
+    for (let x = Math.max(0, box.x0); x < Math.min(W, box.x1); x++) {
+      for (let c = 0; c < 3; c++) sum[c] = sum[c]! + plane[(y * W + x) * 3 + c]!;
+      n++;
+    }
+  return sum.map((v) => v / n / 255);
+}
+
+/** Every prop in the light at the end of dusk: every light on, burning steady. */
+async function writeDuskProps(base: Plane, lights: ReadonlyArray<Light>) {
+  const burning = lights.map((l) => ({ kind: l.kind, x: l.x, y: l.y, level: 1, flicker: 1 }));
+  const grow = (b: Rect, by: number): Rect => ({ x0: b.x0 - by, y0: b.y0 - by, x1: b.x1 + by, y1: b.y1 + by });
+  for (const [name, prop] of Object.entries(STANDING)) {
+    const key = PROP_LIGHT.golden.map((k, c) => k * PROP_LIGHT.dusk[c]!);
+    const sign = name !== "board";
+    // Lamplight is gathered where the scene gathers it: the signpost's or the board's middle.
+    const at = sign ? { x: 2063, y: 1087 } : { x: 830, y: 838 };
+    const image = await loadProp(prop.source);
+    const lit = lightProp(image, {
+      key,
+      warm: warmLight(at, burning),
+      rim: PROP_LIGHT.rimPx / prop.cssPerPixel,
+      lantern: sign ? 0 : 1,
+      air: meanRgb(base, grow(prop.box, 160)),
+      haze: PROP_LIGHT.haze,
+    });
+    const info = await encodeProp(sharp(lit, { raw: { width: image.width, height: image.height, channels: 4 } }), `${name}-dusk`);
+    console.log(`${name}-dusk.webp  ${info.width}×${info.height}  ${Math.round(info.size / 1024)} KB`);
+  }
 }
 
 async function main() {
@@ -534,6 +795,8 @@ async function main() {
     idBuf[i * 3 + 1] = Math.min(255, Math.round((Math.sqrt(bloom[i]! / bloomMax) * 255)));
   }
   await writeVariants("dusk-base", baseBuf, 3, false);
+  await writeBoardWriting();
+  await writeDuskProps(Float32Array.from(baseBuf), lights);
   await writeVariants("dusk-lights", lightsBuf, 4, false);
   await writeVariants("lights", idBuf, 3, true, true);
 

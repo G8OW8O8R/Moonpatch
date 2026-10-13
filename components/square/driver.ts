@@ -1,8 +1,8 @@
 /**
  * Moves the square on the page's own thread: dusk and the closing push-in
  * trail the scroll on a damped follower with a speed limit (like the gate
- * opening), the signpost arms swing on their nails, the camera flies onto
- * the notice board and back. Runs a frame loop only while something moves
+ * opening), the signpost arms swing on their nails and catch the light when
+ * pointed at, the camera flies onto the notice board and back. Runs a frame loop only while something moves
  * and hands every frame to whoever draws it.
  */
 import type { SquareState } from "@/components/gate/renderer/SquareRenderer";
@@ -26,6 +26,8 @@ interface Tween {
 
 const still = (value: number): SpringState => ({ value, velocity: 0 });
 
+type Pointable = ArmId | "board";
+
 export class SquareDriver {
   private readonly reduced: boolean;
   private readonly onFrame: (state: SquareState) => void;
@@ -36,6 +38,12 @@ export class SquareDriver {
   private armTarget: Record<ArmId, number> = { cafe: 0, barn: 0, haunt: 0 };
   private visit: Tween = { from: 0, to: 0, start: 0, length: 0 };
   private props: Tween = { from: 0, to: 0, start: 0, length: 0 };
+  private pointed: Record<Pointable, Tween> = {
+    cafe: { from: 0, to: 0, start: 0, length: 0 },
+    barn: { from: 0, to: 0, start: 0, length: 0 },
+    haunt: { from: 0, to: 0, start: 0, length: 0 },
+    board: { from: 0, to: 0, start: 0, length: 0 },
+  };
   private raf = 0;
   private last = 0;
   private disposed = false;
@@ -63,7 +71,12 @@ export class SquareDriver {
   pointArm(arm: ArmId, pointed: boolean) {
     this.armTarget[arm] = pointed ? ARM_TURN[arm] : 0;
     if (this.reduced) this.arms[arm] = still(this.armTarget[arm]);
-    this.wake();
+    this.point(arm, pointed);
+  }
+
+  /** The board catches the light when pointed at (it has no nail to swing on). */
+  pointBoard(pointed: boolean) {
+    this.point("board", pointed);
   }
 
   /** Flies onto the notice board (or back). */
@@ -95,6 +108,12 @@ export class SquareDriver {
       visit: cameraEase(this.value(this.visit, now)),
       props: this.value(this.props, now),
       arms: { cafe: this.arms.cafe.value, barn: this.arms.barn.value, haunt: this.arms.haunt.value },
+      pointed: {
+        cafe: this.value(this.pointed.cafe, now),
+        barn: this.value(this.pointed.barn, now),
+        haunt: this.value(this.pointed.haunt, now),
+        board: this.value(this.pointed.board, now),
+      },
     };
   }
 
@@ -102,6 +121,11 @@ export class SquareDriver {
     this.disposed = true;
     if (this.raf) cancelAnimationFrame(this.raf);
     this.raf = 0;
+  }
+
+  private point(target: Pointable, pointed: boolean) {
+    this.retarget(this.pointed[target], pointed ? 1 : 0, this.reduced ? 0 : duration.ui);
+    this.wake();
   }
 
   private retarget(tween: Tween, to: number, seconds: number) {
@@ -139,7 +163,7 @@ export class SquareDriver {
     }
     this.onFrame(this.snapshot(now));
 
-    const tweening = [this.visit, this.props].some((t) => this.value(t, now) !== t.to);
+    const tweening = [this.visit, this.props, ...Object.values(this.pointed)].some((t) => this.value(t, now) !== t.to);
     const following = this.dusk.value !== this.target.dusk || this.wander.value !== this.target.wander;
     if (tweening || following || swinging) this.raf = requestAnimationFrame(this.tick);
   };

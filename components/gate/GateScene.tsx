@@ -147,7 +147,11 @@ export function GateScene({
   const holdTimer = useRef(0);
   const openedHere = useRef(false);
   const arrivedOnBoard = useRef(initialView === "visit");
-  /** The opened board, decoded while the visitor is still on the square, so opening it never waits on it. */
+  /**
+   * The opened board's lettering (and, for the plain-HTML square, its image) is fetched while the
+   * visitor is still on the square, so opening it never waits on it.
+   */
+  const boardWarmed = useRef(false);
   const boardImage = useRef<HTMLImageElement | null>(null);
 
   const pathname = usePathname();
@@ -184,7 +188,8 @@ export function GateScene({
     const webgl = modeRef.current === "webgl";
     const onSquare = webgl ? rideAt.current === 1 && rideWanted.current === 1 && squareReady.current : progress.current >= 0.5;
     d.showProps(onSquare || boardOpenRef.current, jump);
-    if (onSquare && !boardImage.current) {
+    // The scene paints the opened board itself; only the plain-HTML square needs its image.
+    if (onSquare && !webgl && !boardImage.current) {
       // Through a <picture> like the panel's, so the browser picks the same file.
       const picture = document.createElement("picture");
       const source = document.createElement("source");
@@ -196,6 +201,9 @@ export function GateScene({
       img.src = OPENED_BOARD;
       void img.decode().catch(() => undefined);
       boardImage.current = img;
+    }
+    if (onSquare && !boardWarmed.current) {
+      boardWarmed.current = true;
       // The board's lettering, so its first layout never waits on a font.
       const css = getComputedStyle(document.documentElement);
       for (const font of [`600 24px ${css.getPropertyValue("--font-fraunces")}`, `500 20px ${css.getPropertyValue("--font-caveat")}`]) {
@@ -398,6 +406,7 @@ export function GateScene({
   }, [square.lang]);
 
   const pointArm = useCallback((arm: ArmId, pointed: boolean) => driver.current?.pointArm(arm, pointed), []);
+  const pointBoard = useCallback((pointed: boolean) => driver.current?.pointBoard(pointed), []);
 
   // The WebGL scene, started once the poster is on screen and the page is idle.
   useEffect(() => {
@@ -480,7 +489,7 @@ export function GateScene({
           },
         );
         // The arms' lettering is set on this thread, where the fonts are.
-        void drawArmLabels(square.t.arms).then((labels) => {
+        void drawArmLabels(square.t.arms, square.lang).then((labels) => {
           for (const [arm, bitmap] of Object.entries(labels) as [ArmId, ImageBitmap][]) {
             if (controller.current && !cancelled) controller.current.setLabel(arm, bitmap);
             else bitmap.close();
@@ -500,7 +509,7 @@ export function GateScene({
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [restart, release, syncProps, showCanvas, square.t.arms]);
+  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang]);
 
   // A fresh frame once the canvas is shown; without the scene nothing may hold the page.
   useEffect(() => {
@@ -553,6 +562,7 @@ export function GateScene({
             paints={htmlSquare}
             boardOpen={boardOpen}
             onPointArm={pointArm}
+            onPointBoard={pointBoard}
             onOpenBoard={openBoard}
           />
         </div>
@@ -563,6 +573,7 @@ export function GateScene({
             arrived={arrived || mode !== "webgl"}
             content={arrived || mode !== "webgl"}
             fade={openedInPage}
+            painted={canvasShown}
             onClose={closeBoard}
           />
         )}

@@ -27,12 +27,6 @@ const cardStyle = (id: CardId): CSSProperties => {
   };
 };
 
-const lanternStyle: CSSProperties = {
-  left: `${(BOARD_PARTS.lantern.x / BOARD.width) * 100}%`,
-  top: `${(BOARD_PARTS.lantern.y / BOARD.height) * 100}%`,
-  width: `${((BOARD_PARTS.lantern.r * 4.8) / BOARD.width) * 100}%`,
-};
-
 export interface VisitPanelProps {
   copy: VisitCopy;
   t: Messages["visit"];
@@ -46,6 +40,11 @@ export interface VisitPanelProps {
   content: boolean;
   /** Opened from the square (fades in), rather than arrived on at its address (simply there). */
   fade: boolean;
+  /**
+   * The scene paints the board itself, its lantern alight, beneath the cards:
+   * the image here is only for the first paint and the plain-HTML square.
+   */
+  painted: boolean;
   onClose(): void;
 }
 
@@ -55,9 +54,10 @@ export interface VisitPanelProps {
  * modal dialog: focus stays inside, Esc and the close button go back to the
  * square. The board image lands exactly where the scene's camera brought it
  * (its place is set in CSS, from the server's first paint), so the hand-over
- * from the canvas cannot be seen.
+ * from the canvas cannot be seen; once the scene runs, the board under the
+ * cards is the scene's own, its lantern alight.
  */
-export function VisitPanel({ copy, t, arrived, content, fade, onClose }: VisitPanelProps) {
+export function VisitPanel({ copy, t, arrived, content, fade, painted, onClose }: VisitPanelProps) {
   const dialog = useRef<HTMLDivElement>(null);
   const close = useRef<HTMLButtonElement>(null);
   // Focus moves in once, and goes back to whatever opened the board when it closes.
@@ -111,9 +111,8 @@ export function VisitPanel({ copy, t, arrived, content, fade, onClose }: VisitPa
         <div className="notice-board absolute">
           <picture>
             <source type="image/avif" srcSet={OPENED_BOARD_AVIF} />
-            <img src={OPENED_BOARD} alt="" className="absolute inset-0 size-full" draggable={false} />
+            <img src={OPENED_BOARD} alt="" className={`absolute inset-0 size-full ${painted ? "invisible" : ""}`} draggable={false} />
           </picture>
-          <span aria-hidden="true" className="notice-lantern absolute" style={lanternStyle} />
 
           <section className="notice-card notice-cream absolute" style={cardStyle("hours")}>
             <h3 className="notice-title">{copy.hours.title}</h3>

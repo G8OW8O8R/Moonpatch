@@ -6,6 +6,7 @@
  * screens get their own placement, worked out from the part of the plate the
  * screen actually shows.
  */
+import { BOARD, BOARD_PARTS } from "./board-parts";
 import { PLATE, type Size } from "./plate-box";
 import type { PlateWindow } from "./gate-rig";
 import { type Shift, type SquareFrame, type Vec2, onScreen, shiftWindow, squareFrame, windowAt } from "./square-rig";
@@ -22,7 +23,6 @@ export type ArmId = "cafe" | "barn" | "haunt";
 /** Source sizes of the layers in public/layers. */
 export const POST = { width: 261, height: 1027 } as const;
 export const ARM = { width: 1331, height: 323 } as const;
-export const BOARD = { width: 1345, height: 2226 } as const;
 
 /** Each arm hangs on a nail, given as a share of the arm image; the haunt shop points the other way. */
 export const ARMS: ReadonlyArray<{ id: ArmId; nail: Vec2; points: "left" | "right" }> = [
@@ -41,24 +41,7 @@ export const ARM_FACE: Readonly<Record<"left" | "right", Rect>> = {
 export const OPENED_BOARD = "/img/square/board-open.webp";
 export const OPENED_BOARD_AVIF = "/img/square/board-open.avif";
 
-/** Notice board landmarks, in pixels of noticeboard.png. */
-export const BOARD_PARTS = {
-  cork: { x: 320, y: 480, w: 725, h: 935 },
-  lantern: { x: 150, y: 668, r: 70 },
-  /** Feet of the two legs. */
-  feet: [
-    { x: 229, y: 2226 },
-    { x: 1127, y: 2226 },
-  ],
-  /** The blank cards pinned to the cork, with their tilt in degrees. */
-  cards: {
-    hours: { x: 368, y: 532, w: 284, h: 400, rotate: 0 },
-    whatsOn: { x: 770, y: 572, w: 233, h: 320, rotate: 1.4 },
-    note: { x: 572, y: 806, w: 248, h: 332, rotate: -3.3 },
-    map: { x: 368, y: 992, w: 272, h: 366, rotate: -1 },
-    drawings: { x: 708, y: 980, w: 314, h: 386, rotate: 3.6 },
-  },
-} as const;
+export { BOARD, BOARD_PARTS };
 
 /**
  * Windows and doors of the three buildings in square plate pixels. Nothing
@@ -142,10 +125,10 @@ const BELOW_WINDOWS = 912;
 /**
  * Where the props stand. Landscape: the signpost on the right verge in the
  * foreground, its arms below the shop windows and inside the frame to the
- * end of the push-in; the board at the left edge of the road, between the
- * barn door and the café, clear of the tagline. Portrait: the frame ends on
- * the café, so the signpost stands in the foreground under it, centred and
- * big enough for a thumb, and the board to the café's left.
+ * end of the push-in; the board in the left foreground at the edge of the
+ * road, right of the barn doors, clear of the tagline. Portrait: the frame
+ * ends on the café, so the signpost stands in the foreground under it,
+ * centred and big enough for a thumb, and the board to the café's left.
  */
 export function propPlacement(viewport: Size): PropPlacement {
   const view = visiblePlate(viewport);
@@ -168,7 +151,8 @@ export function propPlacement(viewport: Size): PropPlacement {
         arm,
         nearness,
       },
-      board: { x: Math.max(view.x + 70 * perCss, 1010), ground: 1004, height: 168, nearness: 1.3 },
+      // As large as the gap between the screen's edge and the café allows.
+      board: { x: 1072, ground: 1004, height: 280, nearness: 1.3 },
     };
   }
   const nearness = 1.7;
@@ -178,7 +162,9 @@ export function propPlacement(viewport: Size): PropPlacement {
   const arm = height / POST_PER_ARM;
   return {
     sign: { x: Math.min(2140, rightLimit(viewport, nearness, 24) - armReach(arm, height)), ground, height, arm, nearness },
-    board: { x: 704, ground: 1000, height: 214, nearness: 1.35 },
+    // In the left foreground on the edge of the road, right of the barn doors and above the tagline.
+    // Its feet stay above the tagline's block, whatever share of the ground the screen shows.
+    board: { x: 830, ground: Math.min(1100, bottom - 200 * perCss), height: 420, nearness: 1.6 },
   };
 }
 
@@ -228,6 +214,34 @@ export function signQuads(sign: SignPlacement): PropQuad[] {
 export function boardQuad(board: BoardPlacement): PropQuad {
   const w = (board.height * BOARD.width) / BOARD.height;
   return { id: "board", rect: { x: board.x - w / 2, y: board.ground - board.height, w, h: board.height }, nearness: board.nearness };
+}
+
+/**
+ * The low golden sun, from the left, throws a short soft shadow of whatever
+ * stands on the ground back and to the right; by dusk it has gone.
+ */
+export const CAST = {
+  /** How far back the shadow reaches, and how far right, as shares of the prop's height. */
+  length: 0.14,
+  skew: 0.32,
+  strength: 0.34,
+} as const;
+
+/**
+ * The shadow a standing prop casts, as four corners on the plate in strip
+ * order (top-left, top-right, bottom-left, bottom-right) matching the top and
+ * bottom of its image: the image's foot stays on its foot.
+ */
+export function castShadow(rect: Rect): [Vec2, Vec2, Vec2, Vec2] {
+  const foot = rect.y + rect.h;
+  const dx = rect.h * CAST.skew;
+  const dy = rect.h * CAST.length;
+  return [
+    { x: rect.x + dx, y: foot - dy },
+    { x: rect.x + rect.w + dx, y: foot - dy },
+    { x: rect.x, y: foot },
+    { x: rect.x + rect.w, y: foot },
+  ];
 }
 
 export function contactShadows(placement: PropPlacement): ContactShadow[] {
@@ -355,12 +369,16 @@ export function propsOnScreen(
 }
 
 /**
- * Light on the props: as photographed at golden hour, cooler and lower at
- * dusk, and warm by the lantern once the board is opened. The opened board
- * is the same image in HTML with the same tint, so the hand-over is seamless.
+ * Light on the opened board up close, warm by its lantern (the light on the
+ * square is in lib/prop-light). The opened board is the same image in HTML
+ * in the same light, so the hand-over is seamless.
  */
 export const PROP_TINT = {
-  golden: [1.0, 0.96, 0.9],
-  dusk: [0.76, 0.66, 0.62],
   open: [1.0, 0.93, 0.84],
 } as const;
+
+/** The plain-HTML square's props in the light at the end of dusk, baked by `pnpm square`. */
+export const DUSK_PROP = (id: PropQuad["id"]) => `/img/square/${id}-dusk.webp`;
+
+/** Faint handwriting on the board's cards, seen from the square; the cards up close carry the real words. */
+export const BOARD_WRITING = "/img/square/board-writing.webp";

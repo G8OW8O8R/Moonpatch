@@ -6,8 +6,9 @@
  */
 import { type Follower, type RigParams, endWindow, followOpening, restWindow, settledState } from "@/lib/gate-rig";
 import type { PosterPlate, Size } from "@/lib/plate-box";
-import type { ArmId, PropQuad } from "@/lib/square-props";
+import { type ArmId, BOARD_WRITING, type PropQuad } from "@/lib/square-props";
 import { type FrameStats, GateRenderer, type GateImages, gateLayers } from "./GateRenderer";
+import { GRAIN_FPS, GrainPass } from "./grain";
 import { type SquareImages, SquareRenderer, type SquareState } from "./SquareRenderer";
 
 export interface PosterInfo {
@@ -102,16 +103,18 @@ const PROP_FILES: Record<PropQuad["id"], string> = {
 async function loadSquareImages(css: Size, dpr: number): Promise<SquareImages> {
   const width = squareWidthFor(css, dpr);
   const ids = Object.keys(PROP_FILES) as PropQuad["id"][];
-  const [base, lights, idMap, ...props] = await Promise.all([
+  const [base, lights, idMap, writing, ...props] = await Promise.all([
     loadBitmap(`/img/square/dusk-base-${width}.webp`, false),
     loadBitmap(`/img/square/dusk-lights-${width}.webp`, false),
     loadBitmap(`/img/square/lights-${width}.webp`, false, true),
+    loadBitmap(BOARD_WRITING, true),
     ...ids.map((id) => loadBitmap(`/img/square/${PROP_FILES[id]}.webp`, true)),
   ]);
   return {
     base: base!,
     lights: lights!,
     ids: idMap!,
+    writing: writing!,
     props: Object.fromEntries(ids.map((id, i) => [id, props[i]!])) as Record<PropQuad["id"], ImageBitmap>,
   };
 }
@@ -154,7 +157,8 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
   let square: SquareState = setup.square;
   let squareRenderer: SquareRenderer | null = null;
   const pendingLabels = new Map<ArmId, ImageBitmap>();
-  let lastGlow = 0;
+  let grain: GrainPass | null = null;
+  let lastStill = 0;
   // A page opened mid-way shows the settled scene at once; motion starts from there.
   const settled = settledState(progress, params);
   let opening: Follower = { value: settled.opening, velocity: 0 };
@@ -204,12 +208,15 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     // Once the ride has landed, the square takes over from the same texture.
     const onSquare = !riding && ride === 1 && !!squareRenderer && setup.debugLayer !== "gate";
     const busy = riding || opening.velocity !== 0 || now - movedAt < 160;
-    const glowing = onSquare && squareRenderer!.glowing(square) && square.visit < 1;
-    // The flicker alone is drawn at about 30 frames a second.
-    if (busy || !glowing || now - lastGlow > 30) {
-      lastGlow = now;
-      if (onSquare) squareRenderer!.render(setup.debugLayer === "plate" ? { ...square, props: 0 } : square, css, renderer.devicePixelRatio, (now - started) / 1000, renderer.size);
+    const seconds = (now - started) / 1000;
+    // The gate draws whenever asked to. The square runs on even at rest, at a film's pace: new grain,
+    // and the lights' flicker, every frame of film.
+    if (busy || !onSquare || now - lastStill >= 1000 / GRAIN_FPS - 4) {
+      lastStill = now;
+      if (onSquare) squareRenderer!.render(setup.debugLayer === "plate" ? { ...square, props: 0 } : square, css, renderer.devicePixelRatio, seconds, renderer.size);
       else renderer.render({ opening: opening.value, ride }, params, riding);
+      // The closed gate is the poster itself; grain comes in along the ride and stays on the square.
+      grain?.draw(onSquare ? 1 : ride * ride, seconds, renderer.size, renderer.devicePixelRatio);
     }
 
     // Keep drawing every frame while anything moves, so motion is smooth and its pace measurable.
@@ -220,7 +227,8 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
       // A page opened past the threshold starts with the ride already landed.
       if (ride === rideTarget) events.onRideSettled(rideTarget);
     }
-    if (busy || glowing) schedule();
+    // The film runs on once the square is drawn; while its layers still upload, the landed frame holds still.
+    if (busy || onSquare) schedule();
     else lastFrame = 0;
   };
 
@@ -259,6 +267,12 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
         renderer.resize(css, dpr);
         schedule();
         startSquare(created);
+        void GrainPass.create(gl!, () => new Promise<void>((resolve) => frames.request(() => resolve())))
+          .then((pass) => {
+            if (disposed) pass.dispose();
+            else grain = pass;
+          })
+          .catch(() => undefined);
       })
       .catch((error: unknown) => fail(error instanceof Error ? error.message : "load failed"));
   }
@@ -299,6 +313,8 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     squareRenderer = null;
     for (const bitmap of pendingLabels.values()) bitmap.close();
     pendingLabels.clear();
+    grain?.dispose();
+    grain = null;
     renderer?.dispose();
     renderer = null;
   }
@@ -337,6 +353,8 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
       css = nextCss;
       dpr = nextDpr;
       renderer?.resize(css, dpr);
+      // A resized canvas is blank: draw the very next frame.
+      lastStill = 0;
       schedule();
     },
     setActive(next) {

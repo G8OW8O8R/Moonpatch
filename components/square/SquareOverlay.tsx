@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { type Ref, useImperativeHandle, useRef } from "react";
+import { type CSSProperties, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { SquareState } from "@/components/gate/renderer/SquareRenderer";
 import { Icon } from "@/components/ui/Icon";
 import type { Locale } from "@/lib/i18n";
 import type { Messages } from "@/lib/messages";
 import { PLATE, type Size, coverSizes } from "@/lib/plate-box";
+import { PROP_LIGHT } from "@/lib/prop-light";
 import { placePath } from "@/lib/routes";
-import { ARMS, type ArmId, PROP_TINT, type PropQuad, propsOnScreen } from "@/lib/square-props";
+import { ARMS, type ArmId, BOARD_WRITING, DUSK_PROP, type PropQuad, propsOnScreen } from "@/lib/square-props";
 import { DUSK, gradeAt } from "@/lib/square-rig";
-import { LABEL_SIZE } from "./labels";
+import { LABEL_SIZE, armLabelSizes } from "./labels";
 
 export interface SquareOverlayHandle {
   /**
@@ -32,6 +33,7 @@ export interface SquareOverlayProps {
   paints: boolean;
   boardOpen: boolean;
   onPointArm(arm: ArmId, pointed: boolean): void;
+  onPointBoard(pointed: boolean): void;
   onOpenBoard(): void;
   ref?: Ref<SquareOverlayHandle>;
 }
@@ -60,6 +62,12 @@ function Plate({ name, className, soft = false }: { name: "square-golden" | "squ
   );
 }
 
+/** The plain-HTML lettering: the scene's size, and the grain of its own arm to wear it. */
+const labelStyle = (arm: ArmId, size: number | undefined): CSSProperties => ({
+  fontSize: `${(size ?? LABEL_SIZE / 0.7) * 100}cqh`,
+  maskImage: `url(/img/square/arm-${arm}.webp)`,
+});
+
 const place = (el: HTMLElement | null, rect: { x: number; y: number; w: number; h: number }, turn = 0, pivot?: { x: number; y: number }) => {
   if (!el) return;
   el.style.width = `${rect.w}px`;
@@ -69,21 +77,52 @@ const place = (el: HTMLElement | null, rect: { x: number; y: number; w: number; 
 };
 
 /**
+ * A prop as the plain-HTML square shows it: in the photograph's golden light,
+ * and the same prop in the light at the end of dusk (baked), laid over it as
+ * dusk falls.
+ */
+function PropImage({ id }: { id: PropQuad["id"] }) {
+  return (
+    <>
+      <picture>
+        <img src={`/img/square/${id}.webp`} alt="" aria-hidden="true" className="prop-golden absolute inset-0 size-full" draggable={false} />
+      </picture>
+      <picture>
+        <img src={DUSK_PROP(id)} alt="" aria-hidden="true" className="prop-dusk absolute inset-0 size-full" draggable={false} />
+      </picture>
+    </>
+  );
+}
+
+/**
  * Everything on the square that is not the photograph: the signpost (links
  * to the three buildings), the notice board (opens the Visit panel), the
  * tagline and the scroll hint. Over WebGL these are invisible hit areas laid
  * exactly over the painted props; without it they carry the props
- * themselves, over plain plates.
+ * themselves, over plain plates, under a still grain.
  */
-export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onOpenBoard, ref }: SquareOverlayProps) {
+export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onPointBoard, onOpenBoard, ref }: SquareOverlayProps) {
   const root = useRef<HTMLDivElement>(null);
   const props = useRef<HTMLDivElement>(null);
   const plates = useRef<HTMLDivElement>(null);
-  const post = useRef<HTMLImageElement>(null);
+  const post = useRef<HTMLDivElement>(null);
   const board = useRef<HTMLButtonElement>(null);
   const arms = useRef<Partial<Record<ArmId, HTMLAnchorElement | null>>>({});
   const shadows = useRef<HTMLDivElement>(null);
   const flags = useRef({ shown: false, dusk: false, tagline: false, door: false });
+  /** Lettering sizes for the plain-HTML arms, measured as the scene measures its own. */
+  const [labelSizes, setLabelSizes] = useState<Partial<Record<ArmId, number>>>({});
+
+  useEffect(() => {
+    if (!paints) return;
+    let cancelled = false;
+    void armLabelSizes(t.arms, lang).then((sizes) => {
+      if (!cancelled) setLabelSizes(sizes);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [paints, t.arms, lang]);
 
   useImperativeHandle(
     ref,
@@ -137,19 +176,20 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onOpenBo
   return (
     <div ref={root} className="square-overlay absolute inset-0" data-webgl={paints ? undefined : ""}>
       {paints && (
-        <svg aria-hidden="true" className="absolute size-0">
-          {/* The props in the evening light, as the scene tints them. */}
-          <filter id="props-dusk" colorInterpolationFilters="sRGB">
-            <feColorMatrix type="matrix" values={`${PROP_TINT.dusk[0]} 0 0 0 0  0 ${PROP_TINT.dusk[1]} 0 0 0  0 0 ${PROP_TINT.dusk[2]} 0 0  0 0 0 1 0`} />
-          </filter>
-        </svg>
-      )}
-      {paints && (
         <div ref={plates} aria-hidden="true" className="square-plates absolute top-0 left-0 overflow-hidden">
           {/* Behind the open board only dusk shows, and only out of focus. */}
           {!boardOpen && <Plate name="square-golden" className="" />}
           <Plate name="square-dusk" className="square-dusk" soft={boardOpen} />
         </div>
+      )}
+      {paints && <div aria-hidden="true" className="square-grain absolute inset-0" />}
+      {paints && (
+        <svg aria-hidden="true" className="absolute size-0">
+          {/* The photograph's golden light on the props, as the scene gives it. */}
+          <filter id="props-golden" colorInterpolationFilters="sRGB">
+            <feColorMatrix type="matrix" values={`${PROP_LIGHT.golden[0]} 0 0 0 0  0 ${PROP_LIGHT.golden[1]} 0 0 0  0 0 ${PROP_LIGHT.golden[2]} 0 0  0 0 0 1 0`} />
+          </filter>
+        </svg>
       )}
 
       <div ref={props} className="square-props absolute inset-0" inert>
@@ -163,9 +203,9 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onOpenBo
 
         <nav aria-label={t.signpost}>
           {paints && (
-            <picture>
-              <img ref={post} src="/img/square/post.webp" alt="" aria-hidden="true" className="sign-post absolute top-0 left-0" draggable={false} />
-            </picture>
+            <div ref={post} aria-hidden="true" className="sign-post absolute top-0 left-0">
+              <PropImage id="post" />
+            </div>
           )}
           <ul>
             {ARMS.map((arm) => (
@@ -182,14 +222,10 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onOpenBo
                   onFocus={() => onPointArm(arm.id, true)}
                   onBlur={() => onPointArm(arm.id, false)}
                 >
-                  {paints && (
-                    <picture>
-                      <img src={`/img/square/arm-${arm.id}.webp`} alt="" className="size-full" draggable={false} />
-                    </picture>
-                  )}
+                  {paints && <PropImage id={`arm-${arm.id}`} />}
                   <span
                     className={paints ? "arm-label" : "sr-only"}
-                    style={paints ? { fontSize: `${LABEL_SIZE * 100}cqh` } : undefined}
+                    style={paints ? labelStyle(arm.id, labelSizes[arm.id]) : undefined}
                   >
                     {t.arms[arm.id]}
                   </span>
@@ -206,11 +242,18 @@ export function SquareOverlay({ lang, t, paints, boardOpen, onPointArm, onOpenBo
           aria-haspopup="dialog"
           aria-expanded={boardOpen}
           onClick={onOpenBoard}
+          onPointerEnter={() => onPointBoard(true)}
+          onPointerLeave={() => onPointBoard(false)}
+          onFocus={() => onPointBoard(true)}
+          onBlur={() => onPointBoard(false)}
         >
           {paints && (
-            <picture>
-              <img src="/img/square/board.webp" alt="" className="size-full" draggable={false} />
-            </picture>
+            <>
+              <PropImage id="board" />
+              <picture>
+                <img src={BOARD_WRITING} alt="" aria-hidden="true" className="board-writing absolute inset-0 size-full" draggable={false} />
+              </picture>
+            </>
           )}
           <span className="sr-only">{t.board}</span>
         </button>

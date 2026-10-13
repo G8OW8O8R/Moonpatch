@@ -6,6 +6,7 @@ import {
   BOARD_PARTS,
   BUILDING_OPENINGS,
   boardQuad,
+  castShadow,
   intersects,
   openedBoard,
   propPlacement,
@@ -72,6 +73,18 @@ describe("propPlacement", () => {
     }
   });
 
+  it.each(landscape)("keeps the board clear of the tagline to the end of the push-in at $width×$height", (viewport) => {
+    // The tagline's block in the bottom-left corner, as the stylesheet sets it (one line, the hint beneath).
+    const clamp = (min: number, v: number, max: number) => Math.min(max, Math.max(min, v));
+    const gutter = clamp(16, viewport.width * 0.028, 56);
+    const font = clamp(36, viewport.width * 0.044, 84);
+    const top = viewport.height - (gutter + 8 + 24 + 12 + font * 1.04);
+    for (const wander of [0, 1]) {
+      const { board } = propsOnScreen(viewport, { dusk: 1, wander, visit: 0 }).props;
+      expect(board.rect.y + board.rect.h, `wander ${wander}`).toBeLessThanOrEqual(top);
+    }
+  });
+
   it("stacks the arms down the post without overlapping, each hung on its nail", () => {
     const quads = signQuads(propPlacement({ width: 1536, height: 864 }).sign);
     const arms = quads.filter((q) => q.id.startsWith("arm-"));
@@ -84,6 +97,16 @@ describe("propPlacement", () => {
       expect(arm.pivot!.x).toBeGreaterThan(quads[0]!.rect.x);
       expect(arm.pivot!.x).toBeLessThan(quads[0]!.rect.x + quads[0]!.rect.w);
     }
+  });
+
+  it("throws the golden-hour shadow back and to the right, its foot on the prop's foot", () => {
+    const rect = { x: 100, y: 200, w: 50, h: 300 };
+    const [tl, tr, bl, br] = castShadow(rect);
+    expect(bl).toEqual({ x: 100, y: 500 });
+    expect(br).toEqual({ x: 150, y: 500 });
+    expect(tl.x).toBeGreaterThan(bl.x);
+    expect(tl.y).toBeLessThan(bl.y);
+    expect(tr.x - tl.x).toBe(50);
   });
 
   it("keeps the props inside the plate", () => {
