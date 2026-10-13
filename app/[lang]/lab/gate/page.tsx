@@ -13,11 +13,11 @@ export default async function GateLabPage({ params }: { params: Promise<{ lang: 
   if (process.env.NODE_ENV === "production") notFound();
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const { gate, square, visit } = getMessages(lang);
+  const { gate, square, visit, rooms } = getMessages(lang);
 
   return (
     <main>
-      <GateLab square={{ lang, t: square, visit, board: visitCopy(lang) }}>
+      <GateLab square={{ lang, t: square, visit, board: visitCopy(lang), rooms }}>
         <GatePoster alt={gate.posterAlt} />
         <div className="sr-only">
           <h1 id="gate-heading">{gate.heading}</h1>

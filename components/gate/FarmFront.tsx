@@ -13,7 +13,7 @@ import { GateScene } from "./GateScene";
  * in the HTML from the first byte.
  */
 export function FarmFront({ lang, initialView = "gate" }: { lang: Locale; initialView?: "gate" | "visit" }) {
-  const { gate, square, visit } = getMessages(lang);
+  const { gate, square, visit, rooms } = getMessages(lang);
   // Opened on the board, the board is the first thing seen.
   if (initialView === "visit") {
     preload(openedBoardFile(1160, "avif"), {
@@ -32,7 +32,7 @@ export function FarmFront({ lang, initialView = "gate" }: { lang: Locale; initia
       <GateScene
         labelledBy="gate-heading"
         initialView={initialView}
-        square={{ lang, t: square, visit, board: visitCopy(lang) }}
+        square={{ lang, t: square, visit, board: visitCopy(lang), rooms }}
       >
         <GatePoster alt={gate.posterAlt} priority={initialView === "gate"} />
         <div className="sr-only">

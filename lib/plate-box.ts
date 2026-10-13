@@ -195,6 +195,25 @@ export function squareBox(viewport: Size): PlateBox {
   return framedBox(viewport, PLATE, portrait ? { ...SQUARE_ANCHOR, zoom: 1 } : SQUARE_ANCHOR);
 }
 
+/** Where each building's door is on the square plates, plate px: the camera flies through these. */
+export const DOORS: Readonly<Record<"cafe" | "barn" | "haunt", Readonly<{ x: number; y: number }>>> = {
+  barn: { x: 522, y: 812 },
+  cafe: { x: 1290, y: 815 },
+  haunt: { x: 2090, y: 790 },
+};
+
+/**
+ * Inside a building the plate rests a little past its cover fit, which
+ * leaves room around the edges for the leaves to slide and the room to
+ * drift with the pointer.
+ */
+export const ROOM_REST_ZOOM = 1.04;
+
+/** Where a room plate sits on this viewport: the cover fit magnified about the screen's centre. */
+export function roomBox(viewport: Size, zoom: number = ROOM_REST_ZOOM): PlateBox {
+  return framedBox(viewport, PLATE, { x: 0.5, y: 0.5, zoom, focus: { u: 0.5, v: 0.5 } });
+}
+
 /** CSS `object-position` that reproduces `plateBox` for the same anchor. */
 export function objectPosition(anchor: Anchor): string {
   const pct = (n: number) => `${+(clamp01(n) * 100).toFixed(4)}%`;

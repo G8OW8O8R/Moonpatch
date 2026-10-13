@@ -18,7 +18,8 @@
     "e2e": "playwright test",
     "images": "node scripts/build-images.ts",
     "layers": "node scripts/key-gate.ts",
-    "square": "node scripts/build-square.ts"
+    "square": "node scripts/build-square.ts",
+    "rooms": "node scripts/build-rooms.ts"
   },
   "dependencies": {
     "lenis": "1.3.26",

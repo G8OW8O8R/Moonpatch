@@ -22,7 +22,7 @@ import {
   signQuads,
   visitShift,
 } from "@/lib/square-props";
-import { flicker, gradeAt, lightLevel, shiftWindow, squareFrame, windowAt } from "@/lib/square-rig";
+import { type Shift, flicker, gradeAt, lightLevel, shiftWindow, squareFrame, windowAt } from "@/lib/square-rig";
 import lightsManifest from "@/components/square/lights.json";
 import {
   type Corner,
@@ -30,6 +30,7 @@ import {
   type Program,
   type Quad,
   type Target,
+  createMipTarget,
   createQuad,
   createTexture,
   deleteTarget,
@@ -210,7 +211,18 @@ export class SquareRenderer {
     return !!(this.base && this.lightsTex && this.ids);
   }
 
-  render(state: SquareState, css: Size, dpr: number, seconds: number, canvas: { width: number; height: number }) {
+  /**
+   * Draws a frame onto the canvas, or into `into` (a frame buffer of the canvas's size), with the
+   * whole scene moved by `camera` on top of its own framing (the push-in on a door).
+   */
+  render(
+    state: SquareState,
+    css: Size,
+    dpr: number,
+    seconds: number,
+    canvas: { width: number; height: number },
+    { into = null, camera }: { into?: WebGLFramebuffer | null; camera?: Shift } = {},
+  ) {
     const { gl } = this;
     const width = canvas.width;
     const height = canvas.height;
@@ -219,7 +231,8 @@ export class SquareRenderer {
     const visit = state.visit;
     const windowFor = (nearness: number): PlateWindow => {
       const w = windowAt(frame, nearness);
-      return visit > 0 ? shiftWindow(w, visitShift(css, frame, placement, visit, nearness)) : w;
+      const seen = visit > 0 ? shiftWindow(w, visitShift(css, frame, placement, visit, nearness)) : w;
+      return camera ? shiftWindow(seen, camera) : seen;
     };
 
     this.updateLevels(state.dusk, seconds);
@@ -233,7 +246,7 @@ export class SquareRenderer {
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.frame.framebuffer);
     } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, into);
     }
     gl.viewport(0, 0, width, height);
     gl.disable(gl.DEPTH_TEST);
@@ -302,7 +315,7 @@ export class SquareRenderer {
 
     if (defocus && this.frame) {
       gl.disable(gl.BLEND);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, into);
       gl.bindTexture(gl.TEXTURE_2D, this.frame.texture);
       gl.generateMipmap(gl.TEXTURE_2D);
       const p = this.defocus;
@@ -495,20 +508,3 @@ void main() {
   gl_Position = vec4(corners[gl_VertexID], 0.0, 1.0);
 }
 `;
-
-/** A full-resolution frame buffer whose texture can be mipmapped, for the out-of-focus scene. */
-function createMipTarget(gl: GL, width: number, height: number): Target {
-  const texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  const levels = Math.floor(Math.log2(Math.max(width, height))) + 1;
-  gl.texStorage2D(gl.TEXTURE_2D, levels, gl.RGBA8, width, height);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  const framebuffer = gl.createFramebuffer();
-  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  return { framebuffer, texture, width, height };
-}

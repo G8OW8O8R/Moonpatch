@@ -4,12 +4,44 @@
  * the textures that suit the screen, loads them, and draws frames only while
  * something moves.
  */
+import {
+  type DoorParams,
+  type Head,
+  type Leg,
+  type Move,
+  blurOf,
+  cameraField,
+  doorShift,
+  exposureMix,
+  inRoom,
+  legAt,
+  moveAt,
+  paceOf,
+  turnAround,
+  unitField,
+} from "@/lib/door-rig";
 import { type Follower, type RigParams, endWindow, followOpening, restWindow, settledState } from "@/lib/gate-rig";
-import type { PosterPlate, Size } from "@/lib/plate-box";
+import { type PosterPlate, type Size, roomBox } from "@/lib/plate-box";
+import { ROOMS, ROOM_IDS, type RoomId } from "@/lib/rooms";
+import { type SpringState, isSettled, stepSpring } from "@/lib/spring";
 import { type ArmId, BOARD_WRITING, type PropQuad, openedBoard } from "@/lib/square-props";
+import { squareFrame, windowAt } from "@/lib/square-rig";
+import { MotionBlurPass } from "./blur";
 import { type FrameStats, GateRenderer, type GateImages, gateLayers } from "./GateRenderer";
 import { GRAIN_FPS, GrainPass } from "./grain";
+import { type RoomImages, RoomRenderer } from "./RoomRenderer";
 import { type SquareImages, SquareRenderer, type SquareState } from "./SquareRenderer";
+
+/** Where the scene stands: out on the square, or inside one of the buildings. */
+export type ScenePlace = "square" | RoomId;
+
+/** Development only: a move held at one moment, for frame-by-frame study. */
+export interface DoorSeek {
+  room: RoomId;
+  leg: Leg;
+  /** Milliseconds into the move. */
+  ms: number;
+}
 
 export interface PosterInfo {
   /** The file the <img> shows. */
@@ -29,6 +61,7 @@ export interface EngineSetup {
   square: SquareState;
   /** Development only: hold the gate renderer ("gate") or draw the square without its props ("plate"), to compare frames. */
   debugLayer?: "gate" | "plate";
+  door: DoorParams;
 }
 
 export interface EngineEvents {
@@ -39,6 +72,14 @@ export interface EngineEvents {
   onRideSettled(ride: 0 | 1): void;
   /** The dusk plates and the props are on the GPU: the square may show its props. */
   onSquareReady(): void;
+  /** A move between the square and a building has cut to the other side. */
+  onCut(place: ScenePlace): void;
+  /** A move has come to rest here. */
+  onPlaced(place: ScenePlace): void;
+  /** Frame times of the move that just ended, ms. */
+  onJourney(frames: number[]): void;
+  /** Development only: a held moment is on the canvas. */
+  onSeeked(ms: number): void;
 }
 
 export interface Engine {
@@ -49,6 +90,12 @@ export interface Engine {
   setSquare(state: SquareState): void;
   /** Lettering for a signpost arm, drawn on the page where the fonts live. */
   setLabel(arm: ArmId, bitmap: ImageBitmap): void;
+  /** Moves the camera onto the square or into a building. */
+  setPlace(place: ScenePlace): void;
+  setDoor(params: DoorParams): void;
+  /** Where a mouse points, -1…1 across the screen; null when it has left. */
+  setPointer(at: { x: number; y: number } | null): void;
+  seek(at: DoorSeek | null): void;
   resize(css: Size, dpr: number): void;
   setActive(active: boolean): void;
   dispose(): void;
@@ -62,6 +109,10 @@ export type ToWorker =
   | { type: "params"; params: RigParams }
   | { type: "square"; state: SquareState }
   | { type: "label"; arm: ArmId; bitmap: ImageBitmap }
+  | { type: "place"; place: ScenePlace }
+  | { type: "door"; params: DoorParams }
+  | { type: "pointer"; at: { x: number; y: number } | null }
+  | { type: "seek"; at: DoorSeek | null }
   | { type: "resize"; css: Size; dpr: number }
   | { type: "active"; active: boolean }
   | { type: "dispose" };
@@ -72,7 +123,11 @@ export type FromWorker =
   | { type: "fail"; reason: string }
   | { type: "stats"; stats: FrameStats }
   | { type: "settled"; ride: 0 | 1 }
-  | { type: "squareReady" };
+  | { type: "squareReady" }
+  | { type: "cut"; place: ScenePlace }
+  | { type: "placed"; place: ScenePlace }
+  | { type: "journey"; frames: number[] }
+  | { type: "seeked"; ms: number };
 
 /** Device pixels per plate pixel above which the full-size layers are worth their weight. */
 const FULL_SIZE_FROM = 0.55;
@@ -119,9 +174,31 @@ async function loadSquareImages(css: Size, dpr: number): Promise<SquareImages> {
   };
 }
 
+/** Rooms load in this order: the café is the door the ride faces. */
+const ROOM_ORDER: readonly RoomId[] = ["cafe", ...ROOM_IDS.filter((id) => id !== "cafe")];
+
+/** Width of the room files for this screen. */
+const roomWidthFor = (css: Size, dpr: number) => (roomBox(css).scale * dpr > FULL_SIZE_FROM ? 2576 : 1600);
+
+async function loadRoomImages(room: RoomId, css: Size, dpr: number, format: string): Promise<RoomImages> {
+  const width = roomWidthFor(css, dpr);
+  const layers = ROOMS[room].layers;
+  const [clean, ...leaves] = await Promise.all([
+    loadBitmap(`/img/rooms/${room}-clean-${width}.${format}`, false),
+    ...layers.map((layer) => loadBitmap(`/img/rooms/${room}-${layer.id}-${width}.webp`, true)),
+  ]);
+  return { clean: clean!, leaves: Object.fromEntries(layers.map((layer, i) => [layer.id, leaves[i]!])) };
+}
+
+/** How the room follows a mouse: critically damped, so it never drifts past where it points. */
+const POINTER_SPRING = { stiffness: 28, damping: 2 * Math.sqrt(28), mass: 1 } as const;
+
+/** The format the browser chose for the poster, used for every plate after it. */
+const posterFormat = (poster: PosterInfo) => (/\.webp(\?|$)/.test(poster.src) ? "webp" : "avif");
+
 async function loadImages({ poster, plate, css, dpr }: EngineSetup): Promise<GateImages> {
   // The square in the same format the browser chose for the poster.
-  const format = /\.webp(\?|$)/.test(poster.src) ? "webp" : "avif";
+  const format = posterFormat(poster);
   const squareWidth = squareWidthFor(css, dpr);
   const size = restWindow(css).scale * dpr > FULL_SIZE_FROM ? "full" : "half";
   // The very file the <img> shows (from the cache), decoded at its own pixel size.
@@ -178,6 +255,26 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
    */
   let squareFrames = -1;
   const frames = frameScheduler();
+  const nextFrame = () => new Promise<void>((resolve) => frames.request(() => resolve()));
+
+  // The camera between the square and the buildings.
+  let door = setup.door;
+  let roomRenderer: RoomRenderer | null = null;
+  let blurPass: MotionBlurPass | null = null;
+  /** Where the page wants the camera. */
+  let wanted: ScenePlace = "square";
+  /** The building the journey leads into (kept while inside it, and on the way back). */
+  let journeyRoom: RoomId | null = null;
+  /** Where the journey rests between moves: 0 on the square, 1 inside. */
+  let journeyJ = 0;
+  let move: Move | null = null;
+  let pointerMoved = false;
+  let journeyFrames: number[] = [];
+  let seekAt: DoorSeek | null = null;
+  let seekShown: DoorSeek | null = null;
+  const loadingPlates = new Set<RoomId>();
+  let pointer = { x: 0, y: 0 };
+  let drift: { x: SpringState; y: SpringState } = { x: { value: 0, velocity: 0 }, y: { value: 0, velocity: 0 } };
 
   const gl = canvas.getContext("webgl2", {
     alpha: false,
@@ -210,6 +307,52 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
       ride = rideTarget === 1 ? Math.min(1, ride + step) : Math.max(0, ride - step);
       if (ride === rideTarget) events.onRideSettled(rideTarget);
     }
+    // Between the square and a building: the move plays here, off the page's thread.
+    let head: Head | null = null;
+    let leg: Leg = 1;
+    if (seekAt) {
+      head = legAt(seekAt.leg, seekAt.ms / 1000, door);
+      leg = seekAt.leg;
+    } else if (move) {
+      const step = moveAt(move, now / 1000, door);
+      head = step.head;
+      leg = step.leg;
+      if (dt > 0) journeyFrames.push(dt * 1000);
+      if (inRoom(head.j) !== inRoom(journeyJ)) events.onCut(inRoom(head.j) ? journeyRoom! : "square");
+      journeyJ = head.j;
+      if (step.done) {
+        move = null;
+        events.onJourney(journeyFrames);
+        journeyFrames = [];
+        events.onPlaced(journeyJ >= 1 ? journeyRoom! : "square");
+        if (journeyJ <= 0) journeyRoom = null;
+        // The way out may have been asked for while the move was still landing.
+        startMove();
+      }
+    }
+    const shownRoom = seekAt ? seekAt.room : journeyRoom;
+    const j = head ? head.j : journeyJ;
+    const journeying = !!shownRoom && !!squareRenderer && !!roomRenderer?.has(shownRoom) && (j > 0 || !!head);
+
+    // Inside, a mouse moves the room a little.
+    const aim = journeying && inRoom(j) ? pointer : { x: 0, y: 0 };
+    drift = { x: stepSpring(drift.x, aim.x, dt, POINTER_SPRING), y: stepSpring(drift.y, aim.y, dt, POINTER_SPRING) };
+    const drifting = pointerMoved || !isSettled(drift.x, aim.x) || !isSettled(drift.y, aim.y);
+    pointerMoved = false;
+
+    if (journeying) {
+      drawJourney(shownRoom!, j, head, leg, now);
+      if (seekAt && seekShown !== seekAt) {
+        seekShown = seekAt;
+        events.onSeeked(seekAt.ms);
+      }
+      if (move || drifting) {
+        renderer.recordFrame(now);
+        schedule();
+      } else lastFrame = 0;
+      return;
+    }
+
     // Once the ride has landed, the square takes over from the same texture.
     const onSquare = !riding && ride === 1 && !!squareRenderer && setup.debugLayer !== "gate";
     const busy = riding || opening.velocity !== 0 || now - movedAt < 160;
@@ -248,6 +391,123 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
   const schedule = () => {
     if (!raf && active && !disposed) raf = frames.request(frame);
   };
+
+  /** One frame of the journey: the square pushed in on the door, or the room, blurred as fast as it moves. */
+  function drawJourney(room: RoomId, j: number, head: Head | null, leg: Leg, now: number) {
+    const gate = renderer!;
+    const size = gate.size;
+    const ratio = gate.devicePixelRatio;
+    const seconds = (now - started) / 1000;
+    const base = windowAt(squareFrame(css, square));
+    const blur = head ? blurOf(paceOf(head, leg, door), door) : 0;
+    const exposure = exposureMix(j, door);
+    const buffered = !!blurPass && (blur > 0.05 || exposure > 0);
+    const into = buffered ? blurPass!.target(size.width, size.height).framebuffer : null;
+    if (inRoom(j)) {
+      roomRenderer!.render(room, { j, drift: { x: drift.x.value, y: drift.y.value }, params: door, into }, css, ratio, size);
+    } else {
+      squareRenderer!.render(square, css, ratio, seconds, size, { into, camera: doorShift(css, base, room, j, door) });
+    }
+    if (buffered) {
+      const field = unitField(css, cameraField(css, base, room, j, door));
+      blurPass!.draw({
+        k: field.k,
+        b: { x: field.b.x * ratio, y: field.b.y * ratio },
+        length: blur,
+        exposure,
+        other: exposure > 0 ? roomRenderer!.meanSource(room) : null,
+      });
+    }
+    // Film on the square only: the room at rest is the very file the page shows.
+    if (!inRoom(j)) grain?.draw(1, seconds, size, ratio, null);
+  }
+
+  /** Starts, or turns around, the move towards where the page wants the camera. */
+  function startMove() {
+    if (seekAt) return;
+    const now = performance.now() / 1000;
+    if (wanted === "square") {
+      if (!journeyRoom) return;
+      if (move) {
+        if (move.leg === 1) move = turnAround(move, now, door);
+      } else if (journeyJ > 0) {
+        journeyFrames = [];
+        move = { kind: "leg", leg: -1, start: now };
+      }
+      schedule();
+      return;
+    }
+    // Room to room comes with the other buildings; until then a journey ends where it began.
+    if (journeyRoom && journeyRoom !== wanted) return;
+    // Waits until the ride has landed and the room is on the GPU.
+    if (!squareRenderer || !roomRenderer?.has(wanted) || ride !== 1 || rideTarget !== 1) return;
+    journeyRoom = wanted;
+    void loadPlate(wanted);
+    if (move) {
+      if (move.leg === -1) move = turnAround(move, now, door);
+    } else if (journeyJ < 1) {
+      journeyFrames = [];
+      move = { kind: "leg", leg: 1, start: now };
+    }
+    schedule();
+  }
+
+  /** The room's own file, for the room at rest; until it is here the clean plate and leaves stand in. */
+  async function loadPlate(room: RoomId) {
+    if (loadingPlates.has(room) || !roomRenderer || roomRenderer.hasPlate(room)) return;
+    loadingPlates.add(room);
+    try {
+      const bitmap = await loadBitmap(`/img/plates/${room}-${roomWidthFor(css, dpr)}.${posterFormat(setup.poster)}`, false);
+      // Uploaded on a frame of its own, never in the middle of a move's.
+      if (!disposed) await nextFrame();
+      if (disposed || !roomRenderer) bitmap.close();
+      else {
+        roomRenderer.setPlate(room, bitmap);
+        schedule();
+      }
+    } catch {
+      loadingPlates.delete(room);
+    }
+  }
+
+  /** Draws a room once into the blur's buffer, out of sight, so the first move finds its program and textures warm. */
+  function warmRoom(room: RoomId) {
+    if (!renderer || !roomRenderer || !blurPass) return;
+    const size = renderer.size;
+    const into = blurPass.target(size.width, size.height).framebuffer;
+    roomRenderer.render(room, { j: 0.5, drift: { x: 0, y: 0 }, params: door, into }, css, renderer.devicePixelRatio, size);
+    gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
+  }
+
+  /** The rooms load behind the square, one texture per free frame, the café first. */
+  function startRooms() {
+    Promise.all([RoomRenderer.create(gl!, nextFrame), MotionBlurPass.create(gl!, nextFrame)])
+      .then(async ([rooms, blur]) => {
+        if (disposed) {
+          rooms.dispose();
+          blur.dispose();
+          return;
+        }
+        roomRenderer = rooms;
+        blurPass = blur;
+        for (const room of ROOM_ORDER) {
+          const images = await loadRoomImages(room, css, dpr, posterFormat(setup.poster));
+          if (disposed) {
+            images.clean.close();
+            for (const bitmap of Object.values(images.leaves)) bitmap.close();
+            return;
+          }
+          await rooms.upload(room, images, nextFrame);
+          await nextFrame();
+          warmRoom(room);
+          await loadPlate(room);
+          startMove();
+          schedule();
+        }
+      })
+      // Without the rooms the square still stands; its doors lead to the rooms' own pages.
+      .catch(() => undefined);
+  }
 
   const onLost = (event: Event) => {
     event.preventDefault();
@@ -312,6 +572,7 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
         squareRenderer = created;
         squareFrames = 0;
         schedule();
+        startRooms();
       })
       // Without its dusk layers the square still stands, in golden light: never worth failing the gate over.
       .catch(() => undefined);
@@ -324,6 +585,10 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     canvas.removeEventListener("webglcontextlost", onLost);
     squareRenderer?.dispose();
     squareRenderer = null;
+    roomRenderer?.dispose();
+    roomRenderer = null;
+    blurPass?.dispose();
+    blurPass = null;
     for (const bitmap of pendingLabels.values()) bitmap.close();
     pendingLabels.clear();
     grain?.dispose();
@@ -361,6 +626,27 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
         pendingLabels.get(arm)?.close();
         pendingLabels.set(arm, bitmap);
       }
+    },
+    setPlace(next) {
+      wanted = next;
+      startMove();
+    },
+    setDoor(next) {
+      door = next;
+      seekShown = null;
+      schedule();
+    },
+    setPointer(at) {
+      pointer = at ?? { x: 0, y: 0 };
+      if (journeyRoom && journeyJ >= 1) {
+        pointerMoved = true;
+        schedule();
+      }
+    },
+    seek(at) {
+      seekAt = at;
+      seekShown = null;
+      schedule();
     },
     resize(nextCss, nextDpr) {
       css = nextCss;

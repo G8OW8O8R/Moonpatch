@@ -1,0 +1,4 @@
+{
+  "look": 0.5,
+  "layers": [{ "id": "door-left", "side": "left", "edge": [[0.11141, 0], [0.1106, 1]], "nearness": 1.15 }]
+}

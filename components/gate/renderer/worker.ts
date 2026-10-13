@@ -19,6 +19,10 @@ scope.onmessage = (event: MessageEvent<ToWorker>) => {
         onStats: (stats) => post({ type: "stats", stats }),
         onRideSettled: (ride) => post({ type: "settled", ride }),
         onSquareReady: () => post({ type: "squareReady" }),
+        onCut: (place) => post({ type: "cut", place }),
+        onPlaced: (place) => post({ type: "placed", place }),
+        onJourney: (frames) => post({ type: "journey", frames }),
+        onSeeked: (ms) => post({ type: "seeked", ms }),
       });
       break;
     case "progress":
@@ -36,6 +40,18 @@ scope.onmessage = (event: MessageEvent<ToWorker>) => {
     case "label":
       if (engine) engine.setLabel(message.arm, message.bitmap);
       else message.bitmap.close();
+      break;
+    case "place":
+      engine?.setPlace(message.place);
+      break;
+    case "door":
+      engine?.setDoor(message.params);
+      break;
+    case "pointer":
+      engine?.setPointer(message.at);
+      break;
+    case "seek":
+      engine?.seek(message.at);
       break;
     case "resize":
       engine?.resize(message.css, message.dpr);

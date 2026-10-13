@@ -3,12 +3,22 @@
  * the canvas to a worker, the whole scene runs there; otherwise it runs on
  * the page. Loaded lazily, after the poster has painted.
  */
+import type { DoorParams } from "@/lib/door-rig";
 import type { RigParams } from "@/lib/gate-rig";
 import type { ArmId } from "@/lib/square-props";
 import { type Size, posterPlate } from "@/lib/plate-box";
 import type { FrameStats } from "./GateRenderer";
 import type { SquareState } from "./SquareRenderer";
-import { type Engine, type EngineEvents, type EngineSetup, type FromWorker, type ToWorker, runGate } from "./engine";
+import {
+  type DoorSeek,
+  type Engine,
+  type EngineEvents,
+  type EngineSetup,
+  type FromWorker,
+  type ScenePlace,
+  type ToWorker,
+  runGate,
+} from "./engine";
 
 export interface GateController {
   setProgress(progress: number): void;
@@ -16,6 +26,10 @@ export interface GateController {
   setParams(params: RigParams): void;
   setSquare(state: SquareState): void;
   setLabel(arm: ArmId, bitmap: ImageBitmap): void;
+  setPlace(place: ScenePlace): void;
+  setDoor(params: DoorParams): void;
+  setPointer(at: { x: number; y: number } | null): void;
+  seek(at: DoorSeek | null): void;
   resize(css: Size): void;
   setActive(active: boolean): void;
   dispose(): void;
@@ -33,6 +47,13 @@ export interface GateCallbacks {
   onRideSettled?(ride: 0 | 1): void;
   /** The square's dusk layers and props are ready to draw. */
   onSquareReady?(): void;
+  /** A move between the square and a building has cut to the other side. */
+  onCut?(place: ScenePlace): void;
+  /** A move has come to rest. */
+  onPlaced?(place: ScenePlace): void;
+  /** Frame times of the move that just ended, ms. */
+  onJourney?(frames: number[]): void;
+  onSeeked?(ms: number): void;
 }
 
 /** The engine behind a worker, driven by messages. */
@@ -45,6 +66,10 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
     else if (message.type === "fail") callbacks.onFail(message.reason);
     else if (message.type === "settled") callbacks.onRideSettled(message.ride);
     else if (message.type === "squareReady") callbacks.onSquareReady();
+    else if (message.type === "cut") callbacks.onCut(message.place);
+    else if (message.type === "placed") callbacks.onPlaced(message.place);
+    else if (message.type === "journey") callbacks.onJourney(message.frames);
+    else if (message.type === "seeked") callbacks.onSeeked(message.ms);
     else callbacks.onStats(message.stats);
   };
   worker.onerror = () => callbacks.onFail("worker failed");
@@ -56,6 +81,10 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
     setParams: (params) => send({ type: "params", params }),
     setSquare: (state) => send({ type: "square", state }),
     setLabel: (arm, bitmap) => send({ type: "label", arm, bitmap }, [bitmap]),
+    setPlace: (place) => send({ type: "place", place }),
+    setDoor: (params) => send({ type: "door", params }),
+    setPointer: (at) => send({ type: "pointer", at }),
+    seek: (at) => send({ type: "seek", at }),
     resize: (css, dpr) => send({ type: "resize", css, dpr }),
     setActive: (active) => send({ type: "active", active }),
     dispose: () => {
@@ -69,7 +98,7 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
 export function startGate(
   canvas: HTMLCanvasElement,
   poster: HTMLImageElement,
-  initial: { css: Size; params: RigParams; progress: number; square: SquareState; debugLayer?: "gate" | "plate" },
+  initial: { css: Size; params: RigParams; door: DoorParams; progress: number; square: SquareState; debugLayer?: "gate" | "plate" },
   callbacks: GateCallbacks,
 ): GateController {
   let css = initial.css;
@@ -96,6 +125,14 @@ export function startGate(
     onSquareReady: () => {
       if (!disposed) callbacks.onSquareReady?.();
     },
+    onCut: (place) => {
+      if (!disposed) callbacks.onCut?.(place);
+    },
+    onPlaced: (place) => {
+      if (!disposed) callbacks.onPlaced?.(place);
+    },
+    onJourney: (frames) => callbacks.onJourney?.(frames),
+    onSeeked: (ms) => callbacks.onSeeked?.(ms),
   };
 
   // The poster's file and natural size are only final once it has decoded.
@@ -110,6 +147,7 @@ export function startGate(
         css,
         dpr: dpr(),
         params: initial.params,
+        door: initial.door,
         progress: initial.progress,
         square: latestSquare,
         ...(initial.debugLayer ? { debugLayer: initial.debugLayer } : {}),
@@ -129,6 +167,10 @@ export function startGate(
       if (engine) engine.setSquare(state);
     },
     setLabel: (arm, bitmap) => withEngine((e) => e.setLabel(arm, bitmap)),
+    setPlace: (place) => withEngine((e) => e.setPlace(place)),
+    setDoor: (params) => withEngine((e) => e.setDoor(params)),
+    setPointer: (at) => engine?.setPointer(at),
+    seek: (at) => withEngine((e) => e.seek(at)),
     resize(next) {
       css = next;
       if (posterPlate(next) !== plate) {

@@ -2,15 +2,18 @@
 
 import "lenis/dist/lenis.css";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type MouseEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type DoorParams, defaultDoor } from "@/lib/door-rig";
 import { type RigParams, defaultRig } from "@/lib/gate-rig";
 import type { Locale } from "@/lib/i18n";
 import type { Messages } from "@/lib/messages";
+import { type RoomId, isRoomId } from "@/lib/rooms";
 import { placeAt, placePath } from "@/lib/routes";
 import { type ArmId, propsOnScreen } from "@/lib/square-props";
 import { DUSK, type Track, defaultTrack, trackAt, trackEnd, trackLength } from "@/lib/square-rig";
 import { SPOT_KEY, readSpot, spotToKeep, startAt, writeSpot } from "@/lib/square-spot";
 import type { VisitCopy } from "@/lib/visit";
+import { Icon } from "@/components/ui/Icon";
 import { publishLenis } from "@/components/ui/lenis-channel";
 import { SquareDriver } from "@/components/square/driver";
 import { drawArmLabels } from "@/components/square/labels";
@@ -18,6 +21,7 @@ import { SquareOverlay, type SquareOverlayHandle } from "@/components/square/Squ
 import { VisitBackdrop, placeBackdrop } from "@/components/square/VisitBackdrop";
 import { VisitPanel, openedBoardPicture } from "@/components/square/VisitPanel";
 import { warmSquare } from "@/components/square/warm";
+import type { DoorSeek, ScenePlace } from "./renderer/engine";
 import type { FrameStats } from "./renderer/GateRenderer";
 import { type SquareState, restingSquare } from "./renderer/SquareRenderer";
 import type { GateController } from "./renderer/start";
@@ -36,6 +40,7 @@ export interface SquareCopy {
   t: Messages["square"];
   visit: Messages["visit"];
   board: VisitCopy;
+  rooms: Messages["rooms"];
 }
 
 export interface GateSceneProps {
@@ -48,6 +53,12 @@ export interface GateSceneProps {
   /** Lengths of the scroll, in viewport heights. */
   track?: Track;
   params?: RigParams;
+  /** The camera between the square and the buildings. */
+  door?: DoorParams;
+  /** Development only: hold a move at one moment. */
+  seek?: DoorSeek | null;
+  /** Frame times of each move to or from a building, ms. */
+  onJourney?: (frames: number[]) => void;
   onDebug?: (state: GateDebugState) => void;
 }
 
@@ -108,6 +119,9 @@ const prefersReduced = () => window.matchMedia("(prefers-reduced-motion: reduce)
  */
 const startedCanvases = new WeakSet<HTMLCanvasElement>();
 
+/** Buildings the camera flies into; the others still open on their own pages. */
+const ROOMS_IN_SCENE: ReadonlySet<RoomId> = new Set<RoomId>(["cafe"]);
+
 /** Set once a scene has left the page for another place on the farm: coming back to one is a return. */
 let sceneLeft = false;
 
@@ -143,6 +157,9 @@ export function GateScene({
   initialView = "gate",
   track = defaultTrack,
   params = defaultRig,
+  door = defaultDoor,
+  seek = null,
+  onJourney,
   onDebug,
 }: GateSceneProps) {
   const section = useRef<HTMLElement>(null);
@@ -165,6 +182,16 @@ export function GateScene({
   /** The scene has its first frame; it is shown once it can draw the square, if that is where the page is. */
   const engineReady = useRef(false);
   const paramsRef = useRef(params);
+  const doorRef = useRef(door);
+  const onJourneyRef = useRef(onJourney);
+  /** The building the camera is in, from the cut on (null out on the square). */
+  const [inside, setInside] = useState<RoomId | null>(null);
+  const insideRef = useRef<RoomId | null>(null);
+  /** On the way into a building, inside it, or on the way out: the square's own layer stands aside. */
+  const [away, setAway] = useState(false);
+  const awayRef = useRef(false);
+  /** The building was entered from the square in this visit, so the way out is the browser's way back. */
+  const roomFromHere = useRef(false);
   const trackRef = useRef(track);
   const [mode, setMode] = useState<Mode>("poster");
   const [reason, setReason] = useState("");
@@ -196,7 +223,9 @@ export function GateScene({
   const signpost = useRef({ labels: square.t.arms, lang: square.lang });
 
   const pathname = usePathname();
-  const boardOpen = placeAt(pathname ?? "")?.place === "visit";
+  const here = placeAt(pathname ?? "")?.place;
+  const boardOpen = here === "visit";
+  const room = isRoomId(here) && ROOMS_IN_SCENE.has(here) ? here : null;
   const boardOpenRef = useRef(boardOpen);
 
   // While the timed ride plays, the page holds still inside the section; it lets go when the ride lands.
@@ -316,8 +345,8 @@ export function GateScene({
           if (openedHere.current) placeBackdrop(backdrop.current, plate, state.visit);
           else placeBackdrop(backdrop.current, propsOnScreen(size, { dusk: 1, wander: 1, visit: 1 }, { pan: false }).plate, 1);
         }
-        // Paper type once the sky has darkened, and over the opened board.
-        const header = state.dusk >= DUSK.header || state.visit > 0 ? "paper" : "ink";
+        // Paper type once the sky has darkened, over the opened board and inside the buildings.
+        const header = insideRef.current || state.dusk >= DUSK.header || state.visit > 0 ? "paper" : "ink";
         if (section.current && section.current.dataset.header !== header) section.current.dataset.header = header;
         setArrived(boardOpenRef.current && state.visit >= 0.999);
         // A ride back that waited for dusk to lift can go now.
@@ -449,6 +478,103 @@ export function GateScene({
     }
   }, [square.lang]);
 
+  // Into a building and out again: the scene plays the move; the page only says where to go.
+  useEffect(() => {
+    const c = controller.current;
+    if (room) {
+      if (modeRef.current !== "webgl" || !c) return;
+      awayRef.current = true;
+      setAway(true);
+      lenis.current?.stop();
+      c.setPlace(room);
+    } else if (awayRef.current) {
+      c?.setPlace("square");
+    }
+  }, [room]);
+
+  /** The camera has cut across: the header and the room's own copy follow it. */
+  const cutTo = useCallback((place: ScenePlace) => {
+    const next = place === "square" ? null : place;
+    insideRef.current = next;
+    setInside(next);
+    if (next && section.current) section.current.dataset.header = "paper";
+    else driver.current?.refresh();
+  }, []);
+
+  /** A move has landed: inside, the square waits under the room at the end of its path; outside, the page scrolls again. */
+  const placed = useCallback(
+    (place: ScenePlace) => {
+      const html = document.documentElement;
+      if (place === "square") {
+        awayRef.current = false;
+        setAway(false);
+        html.style.overflow = "";
+        if (!boardOpenRef.current) lenis.current?.start();
+        return;
+      }
+      const el = section.current;
+      const unit = stage.current?.clientHeight ?? window.innerHeight;
+      if (el) window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY + trackEnd(trackRef.current) * unit, behavior: "instant" });
+      measure();
+      driver.current?.follow(1, 1, true);
+      html.style.overflow = "hidden";
+    },
+    [measure],
+  );
+
+  useEffect(() => () => void (document.documentElement.style.overflow = ""), []);
+
+  const enterRoom = useCallback(
+    (arm: ArmId, event: MouseEvent<HTMLAnchorElement>) => {
+      // The scene takes the visitor in itself only from the drawn square; otherwise the link opens the room's page.
+      if (!ROOMS_IN_SCENE.has(arm) || modeRef.current !== "webgl" || rideAt.current !== 1 || !squareReady.current) return;
+      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      roomFromHere.current = true;
+      window.history.pushState(null, "", placePath(square.lang, arm));
+    },
+    [square.lang],
+  );
+
+  const leaveRoom = useCallback(() => {
+    if (roomFromHere.current) {
+      roomFromHere.current = false;
+      window.history.back();
+    } else {
+      window.history.pushState(null, "", placePath(square.lang, "square"));
+    }
+  }, [square.lang]);
+
+  useEffect(() => {
+    if (!inside) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") leaveRoom();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [inside, leaveRoom]);
+
+  /** Inside, a mouse moves the room a little. */
+  const point = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse" || !insideRef.current) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    controller.current?.setPointer({ x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: ((event.clientY - rect.top) / rect.height) * 2 - 1 });
+  }, []);
+  const unpoint = useCallback(() => controller.current?.setPointer(null), []);
+
+  useEffect(() => {
+    doorRef.current = door;
+    controller.current?.setDoor(door);
+  }, [door]);
+
+  useEffect(() => {
+    onJourneyRef.current = onJourney;
+  }, [onJourney]);
+
+  useEffect(() => {
+    controller.current?.seek(seek);
+  }, [seek]);
+
   const pointArm = useCallback((arm: ArmId, pointed: boolean) => driver.current?.pointArm(arm, pointed), []);
   const pointBoard = useCallback((pointed: boolean) => driver.current?.pointBoard(pointed), []);
 
@@ -506,6 +632,7 @@ export function GateScene({
           {
             css: { width: stageEl.clientWidth, height: stageEl.clientHeight },
             params: paramsRef.current,
+            door: doorRef.current,
             progress: progress.current,
             square: driver.current?.snapshot() ?? restingSquare,
             ...debugLayer(),
@@ -539,6 +666,12 @@ export function GateScene({
               syncProps();
               showCanvas();
             },
+            onCut: cutTo,
+            onPlaced: placed,
+            onJourney: (frames) => onJourneyRef.current?.(frames),
+            onSeeked: (ms) => {
+              if (section.current) section.current.dataset.seeked = String(ms);
+            },
           },
         );
         // The arms' lettering is set on this thread, where the fonts are.
@@ -563,7 +696,7 @@ export function GateScene({
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang, initialView]);
+  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang, initialView, cutTo, placed]);
 
   // A fresh frame once the canvas is shown; without the scene nothing may hold the page.
   useEffect(() => {
@@ -599,7 +732,13 @@ export function GateScene({
       className="relative"
       style={{ height: `${trackLength(track) * 100}lvh` }}
     >
-      <div ref={stage} className="scene-stage sticky top-0 h-lvh overflow-hidden bg-bark" data-cut={cut ? "" : undefined}>
+      <div
+        ref={stage}
+        className="scene-stage sticky top-0 h-lvh overflow-hidden bg-bark"
+        data-cut={cut ? "" : undefined}
+        onPointerMove={inside ? point : undefined}
+        onPointerLeave={inside ? unpoint : undefined}
+      >
         {children}
         <canvas
           key={restart}
@@ -608,7 +747,10 @@ export function GateScene({
           data-gate-canvas={mode}
           className={`absolute inset-0 size-full ${canvasShown ? "" : "invisible"}`}
         />
-        <div className={`absolute inset-0 ${cut ? "" : "transition-opacity duration-150"} ${htmlSquare || mode === "webgl" ? "opacity-100" : "pointer-events-none opacity-0"}`}>
+        <div
+          inert={away || !!seek}
+          className={`absolute inset-0 ${cut ? "" : "transition-opacity duration-150"} ${!away && !seek && (htmlSquare || mode === "webgl") ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        >
           <SquareOverlay
             ref={overlay}
             lang={square.lang}
@@ -620,8 +762,18 @@ export function GateScene({
             onPointArm={pointArm}
             onPointBoard={pointBoard}
             onOpenBoard={openBoard}
+            onEnterRoom={enterRoom}
           />
         </div>
+        {inside && (
+          <div className="absolute inset-0">
+            <h1 className="sr-only">{square.rooms[inside].title}</h1>
+            <button type="button" onClick={leaveRoom} className="room-back transition-opacity duration-300 starting:opacity-0">
+              <Icon name="arrow-left" className="drop-shadow-hug" />
+              <span>{square.rooms.back}</span>
+            </button>
+          </div>
+        )}
         {boardOpen && <VisitBackdrop ref={backdrop} painted={canvasShown} />}
         {boardOpen && (
           <VisitPanel

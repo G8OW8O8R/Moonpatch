@@ -150,3 +150,20 @@ export function deleteTarget(gl: GL, target: Target) {
   gl.deleteFramebuffer(target.framebuffer);
   gl.deleteTexture(target.texture);
 }
+
+/** A full-resolution frame buffer whose texture can be mipmapped, to be read out of focus or for its mean. */
+export function createMipTarget(gl: GL, width: number, height: number): Target {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  const levels = Math.floor(Math.log2(Math.max(width, height))) + 1;
+  gl.texStorage2D(gl.TEXTURE_2D, levels, gl.RGBA8, width, height);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  const framebuffer = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { framebuffer, texture, width, height };
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { type CSSProperties, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { type CSSProperties, type MouseEvent, type Ref, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { SquareState } from "@/components/gate/renderer/SquareRenderer";
 import { Icon } from "@/components/ui/Icon";
 import type { Locale } from "@/lib/i18n";
@@ -45,6 +45,8 @@ export interface SquareOverlayProps {
   onPointArm(arm: ArmId, pointed: boolean): void;
   onPointBoard(pointed: boolean): void;
   onOpenBoard(): void;
+  /** An arm was followed: the scene may take the visitor in itself (it then cancels the link). */
+  onEnterRoom?(arm: ArmId, event: MouseEvent<HTMLAnchorElement>): void;
   ref?: Ref<SquareOverlayHandle>;
 }
 
@@ -112,7 +114,7 @@ function PropImage({ id }: { id: PropQuad["id"] }) {
  * exactly over the painted props; without it they carry the props
  * themselves, over plain plates, under a still grain.
  */
-export function SquareOverlay({ lang, t, paints: paintsSquare, plates: squareWanted, first, boardOpen, onPointArm, onPointBoard, onOpenBoard, ref }: SquareOverlayProps) {
+export function SquareOverlay({ lang, t, paints: paintsSquare, plates: squareWanted, first, boardOpen, onPointArm, onPointBoard, onOpenBoard, onEnterRoom, ref }: SquareOverlayProps) {
   // Behind the board opened on its own address nothing of the square is drawn here: not one image is fetched for it.
   const paints = paintsSquare && squareWanted;
   const root = useRef<HTMLDivElement>(null);
@@ -234,6 +236,7 @@ export function SquareOverlay({ lang, t, paints: paintsSquare, plates: squareWan
                   onPointerLeave={() => onPointArm(arm.id, false)}
                   onFocus={() => onPointArm(arm.id, true)}
                   onBlur={() => onPointArm(arm.id, false)}
+                  onClick={(event) => onEnterRoom?.(arm.id, event)}
                 >
                   {paints && <PropImage id={`arm-${arm.id}`} />}
                   <span
