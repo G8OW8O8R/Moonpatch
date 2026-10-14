@@ -3,6 +3,7 @@
 import { type CSSProperties, type KeyboardEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useFocusTrap } from "@/components/ui/useFocusTrap";
+import { useScrollArea } from "@/components/ui/useScrollArea";
 import { useBasket } from "@/lib/basket-store";
 import { FLIGHT_EVENT, type FlightDetail } from "@/lib/flight";
 import { growFrom } from "@/lib/hotspots";
@@ -36,19 +37,10 @@ export function ProductCard({ product, lang, t, from, seed, onClose }: ProductCa
   const motion = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
   const [done, setDone] = useState(false);
-  // A description longer than the card scrolls, and then the keyboard can reach and scroll it.
-  const [scrolls, setScrolls] = useState(false);
-  const scrollArea = useCallback((el: HTMLDivElement | null) => {
-    if (!el) return;
-    const check = () => setScrolls(el.scrollHeight > el.clientHeight + 1);
-    check();
-    const observer = new ResizeObserver(check);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
   const recipe = product.card === "recipe";
   const titleId = `card-${product.id}-title`;
-  const scrollProps = scrolls ? ({ tabIndex: 0, role: "group", "aria-labelledby": titleId } as const) : {};
+  // A description longer than the card scrolls, and then the keyboard can reach and scroll it.
+  const scrollArea = useScrollArea(titleId);
   const edge = useMemo(() => (recipe ? tornPolygon(product.id, { depth: 3.5, points: 56 }) : undefined), [product.id, recipe]);
 
   useFocusTrap(sheet, { restore: seed });
@@ -155,7 +147,7 @@ export function ProductCard({ product, lang, t, from, seed, onClose }: ProductCa
                 <h2 id={titleId} className="card-title font-display">
                   {name}
                 </h2>
-                <div ref={scrollArea} className="card-scroll" data-lenis-prevent {...scrollProps}>
+                <div ref={scrollArea} className="card-scroll scroll-area" data-lenis-prevent>
                   <p className="card-description">{product.description[lang]}</p>
                   {product.ingredients && (
                     <div className="card-ingredients">
@@ -179,7 +171,7 @@ export function ProductCard({ product, lang, t, from, seed, onClose }: ProductCa
                   <h2 id={titleId} className="card-title font-display">
                     {name}
                   </h2>
-                  <div ref={scrollArea} className="card-scroll" data-lenis-prevent {...scrollProps}>
+                  <div ref={scrollArea} className="card-scroll scroll-area" data-lenis-prevent>
                     <p className="card-description">{product.description[lang]}</p>
                   </div>
                   {foot}

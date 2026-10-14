@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
 import { subscribeLenis } from "@/components/ui/lenis-channel";
 import { useFocusTrap } from "@/components/ui/useFocusTrap";
+import { useScrollArea } from "@/components/ui/useScrollArea";
 import { useBasket } from "@/lib/basket-store";
 import { FRAME_GAP, type Orientation, type PassOrder, type Rect, framePath, outlinePolygon, passDate, passLayout, passNumber } from "@/lib/farm-pass";
 import type { Locale } from "@/lib/i18n";
@@ -66,6 +67,9 @@ export function FarmPass({ lang, t, order, onClose }: { lang: Locale; t: Message
   const [day, hours] = passDate(order.day, lang, t.hours);
   const wide = orientation === "wide";
   const number = passNumber(order);
+
+  // The ticket is scaled to fit; on a window too short even for that, it scrolls above the links.
+  const scrollArea = useScrollArea("pass-title");
 
   useFocusTrap(dialog, { initial: saveButton, restore: () => document.querySelector<HTMLElement>(".basket-button") });
 
@@ -199,100 +203,102 @@ export function FarmPass({ lang, t, order, onClose }: { lang: Locale; t: Message
     <div className="pass-layer" onKeyDown={onKeyDown}>
       <div className="pass-scrim" aria-hidden="true" onClick={close} />
       <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="pass-title" aria-describedby="pass-note" tabIndex={-1} className="pass">
-        <div className="pass-fit" style={{ width: layout.width * scale, height: layout.height * scale }}>
-          <div ref={motion} className="pass-motion">
-            <article
-              ref={ticket}
-              className="pass-ticket"
-              data-orientation={orientation}
-              aria-labelledby="pass-title"
-              style={{ width: layout.width, height: layout.height, transform: `scale(${scale})` }}
-            >
-              <div
-                data-piece="main"
-                className="pass-piece"
-                style={{ left: mainBox.x, top: mainBox.y, width: mainBox.width, height: mainBox.height, clipPath: outlinePolygon(layout.main, mainBox.x, mainBox.y) }}
+        <div ref={scrollArea} className="pass-body scroll-area" data-lenis-prevent>
+          <div className="pass-fit" style={{ width: layout.width * scale, height: layout.height * scale }}>
+            <div ref={motion} className="pass-motion">
+              <article
+                ref={ticket}
+                className="pass-ticket"
+                data-orientation={orientation}
+                aria-labelledby="pass-title"
+                style={{ width: layout.width, height: layout.height, transform: `scale(${scale})` }}
               >
-                <Frames frame={layout.mainFrame} box={mainBox}>
-                  <path id="pass-arc" d={`M${cx - r} ${cy} A${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="none" />
-                  <text data-arc="" className="pass-arc">
-                    <textPath href="#pass-arc" startOffset="50%" textAnchor="middle">
-                      {t.passTitle.toLocaleUpperCase(lang)}
-                    </textPath>
-                  </text>
-                </Frames>
-                <h2 id="pass-title" className="sr-only">
-                  {t.passTitle}, Moonpatch Farm
-                </h2>
-                {/* eslint-disable-next-line @next/next/no-img-element -- drawn again onto the saved picture */}
-                <img
-                  src="/brand/wordmark.svg"
-                  alt=""
-                  className="pass-wordmark"
-                  style={{ left: layout.wordmark.x, top: layout.wordmark.y, width: layout.wordmark.width, height: layout.wordmark.height }}
-                  draggable={false}
-                />
-                <p className="pass-date font-display">
-                  {(wide ? [`${day} · ${hours}`] : [day, hours]).map((words, i) => (
-                    <span key={i} className="pass-line" style={at(layout.date[i]!)}>
-                      <span data-ink="">{words}</span>
-                    </span>
-                  ))}
-                </p>
-                <p className="pass-line pass-waiting font-display" style={at(layout.waiting)}>
-                  <span data-ink="">{t.passWaiting}</span>
-                </p>
-                <ul className="pass-list font-display" style={at(layout.list.top)}>
-                  {items.map((item) => (
-                    <li key={item.id} style={{ height: layout.list.step }}>
-                      <span data-ink="" className="pass-qty">
-                        {item.qty} ×
-                      </span>{" "}
-                      <span data-ink="">{item.product.name[lang]}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div
-                ref={stubRef}
-                data-piece="stub"
-                className="pass-piece pass-stub"
-                style={{
-                  left: stubBox.x,
-                  top: stubBox.y,
-                  width: stubBox.width,
-                  height: stubBox.height,
-                  clipPath: outlinePolygon(layout.stub, stubBox.x, stubBox.y),
-                  backgroundPosition: `0 0, ${-stubBox.x}px ${-stubBox.y}px`,
-                }}
-              >
-                <Frames frame={layout.stubFrame} box={stubBox} />
-                <p className="pass-serial" style={{ right: stubBox.x + stubBox.width - layout.serial.right, top: layout.serial.top - stubBox.y }}>
-                  <span data-ink="">Nº {number}</span>
-                </p>
-                <p
-                  data-admit=""
-                  className="pass-admit font-display"
-                  style={{ left: layout.admit.x - stubBox.x, top: layout.admit.y - stubBox.y, transform: `translate(-50%, -50%) rotate(${layout.admit.rotate}deg)` }}
+                <div
+                  data-piece="main"
+                  className="pass-piece"
+                  style={{ left: mainBox.x, top: mainBox.y, width: mainBox.width, height: mainBox.height, clipPath: outlinePolygon(layout.main, mainBox.x, mainBox.y) }}
                 >
-                  {t.passAdmit.toLocaleUpperCase(lang)}
-                </p>
-                {/* eslint-disable-next-line @next/next/no-img-element -- drawn again onto the saved picture */}
-                <img
-                  data-stamp=""
-                  src="/img/textures/stamp-moon.webp"
-                  alt={t.passStamp}
-                  className="pass-stamp"
+                  <Frames frame={layout.mainFrame} box={mainBox}>
+                    <path id="pass-arc" d={`M${cx - r} ${cy} A${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="none" />
+                    <text data-arc="" className="pass-arc">
+                      <textPath href="#pass-arc" startOffset="50%" textAnchor="middle">
+                        {t.passTitle.toLocaleUpperCase(lang)}
+                      </textPath>
+                    </text>
+                  </Frames>
+                  <h2 id="pass-title" className="sr-only">
+                    {t.passTitle}, Moonpatch Farm
+                  </h2>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- drawn again onto the saved picture */}
+                  <img
+                    src="/brand/wordmark.svg"
+                    alt=""
+                    className="pass-wordmark"
+                    style={{ left: layout.wordmark.x, top: layout.wordmark.y, width: layout.wordmark.width, height: layout.wordmark.height }}
+                    draggable={false}
+                  />
+                  <p className="pass-date font-display">
+                    {(wide ? [`${day} · ${hours}`] : [day, hours]).map((words, i) => (
+                      <span key={i} className="pass-line" style={at(layout.date[i]!)}>
+                        <span data-ink="">{words}</span>
+                      </span>
+                    ))}
+                  </p>
+                  <p className="pass-line pass-waiting font-display" style={at(layout.waiting)}>
+                    <span data-ink="">{t.passWaiting}</span>
+                  </p>
+                  <ul className="pass-list font-display" style={at(layout.list.top)}>
+                    {items.map((item) => (
+                      <li key={item.id} style={{ height: layout.list.step }}>
+                        <span data-ink="" className="pass-qty">
+                          {item.qty} ×
+                        </span>{" "}
+                        <span data-ink="">{item.product.name[lang]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div
+                  ref={stubRef}
+                  data-piece="stub"
+                  className="pass-piece pass-stub"
                   style={{
-                    left: layout.stamp.x - stubBox.x - layout.stamp.size / 2,
-                    top: layout.stamp.y - stubBox.y - layout.stamp.size / 2,
-                    width: layout.stamp.size,
-                    transform: `rotate(${layout.stamp.rotate}deg)`,
+                    left: stubBox.x,
+                    top: stubBox.y,
+                    width: stubBox.width,
+                    height: stubBox.height,
+                    clipPath: outlinePolygon(layout.stub, stubBox.x, stubBox.y),
+                    backgroundPosition: `0 0, ${-stubBox.x}px ${-stubBox.y}px`,
                   }}
-                  draggable={false}
-                />
-              </div>
-            </article>
+                >
+                  <Frames frame={layout.stubFrame} box={stubBox} />
+                  <p className="pass-serial" style={{ right: stubBox.x + stubBox.width - layout.serial.right, top: layout.serial.top - stubBox.y }}>
+                    <span data-ink="">Nº {number}</span>
+                  </p>
+                  <p
+                    data-admit=""
+                    className="pass-admit font-display"
+                    style={{ left: layout.admit.x - stubBox.x, top: layout.admit.y - stubBox.y, transform: `translate(-50%, -50%) rotate(${layout.admit.rotate}deg)` }}
+                  >
+                    {t.passAdmit.toLocaleUpperCase(lang)}
+                  </p>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- drawn again onto the saved picture */}
+                  <img
+                    data-stamp=""
+                    src="/img/textures/stamp-moon.webp"
+                    alt={t.passStamp}
+                    className="pass-stamp"
+                    style={{
+                      left: layout.stamp.x - stubBox.x - layout.stamp.size / 2,
+                      top: layout.stamp.y - stubBox.y - layout.stamp.size / 2,
+                      width: layout.stamp.size,
+                      transform: `rotate(${layout.stamp.rotate}deg)`,
+                    }}
+                    draggable={false}
+                  />
+                </div>
+              </article>
+            </div>
           </div>
         </div>
         <div className="pass-foot">

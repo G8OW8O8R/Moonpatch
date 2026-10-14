@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/ui/Icon";
 import { subscribeLenis } from "@/components/ui/lenis-channel";
 import { useFocusTrap } from "@/components/ui/useFocusTrap";
+import { useScrollArea } from "@/components/ui/useScrollArea";
 import { type PricedLine, formatDay, formatMoney, sections, visitDays } from "@/lib/basket";
 import { useBasket } from "@/lib/basket-store";
 import { type PassOrder, passOrder } from "@/lib/farm-pass";
@@ -76,6 +77,7 @@ export function BasketDialog({ lang, t, onClose, onPass }: { lang: Locale; t: Me
   const closeButton = useRef<HTMLButtonElement>(null);
   const daysRef = useRef<HTMLFieldSetElement>(null);
   const closing = useRef(false);
+  const scrollArea = useScrollArea("basket-title");
   const lines = useBasket((state) => state.lines);
   const visitDay = useBasket((state) => state.visitDay);
   const pickDay = useBasket((state) => state.pickDay);
@@ -220,21 +222,28 @@ export function BasketDialog({ lang, t, onClose, onPass }: { lang: Locale; t: Me
                 <Icon name="wheelbarrow" className="basket-title-barrow" />
               </h2>
 
-              {done ? (
-                <div className="basket-done" role="status">
-                  <p className="basket-done-day font-display">{t.shipped}</p>
-                  <p>{t.charged}</p>
-                  <button type="button" className="basket-link" onClick={close}>
-                    {t.back}
-                  </button>
-                </div>
-              ) : empty ? (
-                <p className="basket-empty">{t.empty}</p>
-              ) : (
-                <>
-                  {section("ship")}
-                  {both && <Rule />}
-                  {section("visit")}
+              <div ref={scrollArea} className="basket-body scroll-area" data-lenis-prevent>
+                {done ? (
+                  <div className="basket-done" role="status">
+                    <p className="basket-done-day font-display">{t.shipped}</p>
+                    <p>{t.charged}</p>
+                    <button type="button" className="basket-link" onClick={close}>
+                      {t.back}
+                    </button>
+                  </div>
+                ) : empty ? (
+                  <p className="basket-empty">{t.empty}</p>
+                ) : (
+                  <>
+                    {section("ship")}
+                    {both && <Rule />}
+                    {section("visit")}
+                  </>
+                )}
+              </div>
+
+              {!done && !empty && (
+                <div className="basket-end">
                   <Rule />
                   <p className="basket-total">
                     <span>{t.total}</span>
@@ -246,7 +255,7 @@ export function BasketDialog({ lang, t, onClose, onPass }: { lang: Locale; t: Me
                       {t.checkout}
                     </button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </div>

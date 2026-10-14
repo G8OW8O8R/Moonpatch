@@ -1284,6 +1284,20 @@
     }
   }
 
+  /* The scrolling middle of every dialog. Its lower edge fades out while there is more below. */
+  .scroll-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-ink) 30%, transparent) transparent;
+  }
+
+  .scroll-area[data-scrolls]:not([data-end]) {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 2.5rem), transparent);
+  }
+
   .card-layer {
     z-index: 2;
   }
@@ -1327,12 +1341,7 @@
   }
 
   .card-scroll {
-    flex: 1 1 auto;
     min-height: 3rem;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in srgb, var(--color-ink) 30%, transparent) transparent;
   }
 
   .card-title {
@@ -1414,7 +1423,7 @@
     --top: calc(var(--spacing-gutter) + 3.5rem);
     right: var(--spacing-gutter);
     top: var(--top);
-    width: clamp(300px, min(26vw, 44lvh), 460px);
+    width: clamp(300px, min(26vw, 44dvh), 460px);
   }
 
   .recipe-shadow {
@@ -1422,11 +1431,11 @@
   }
 
   .recipe-paper {
-    --photo-max: 38lvh;
+    --photo-max: 38dvh;
     position: relative;
     display: flex;
     flex-direction: column;
-    max-height: calc(100lvh - var(--top) - var(--spacing-gutter));
+    max-height: calc(100dvh - var(--top) - var(--spacing-gutter));
     padding: 3.25rem 1.75rem 1.75rem;
     background: var(--color-cream) url(/textures/paper-cream.jpg) 0 0 / 480px auto;
   }
@@ -1459,9 +1468,9 @@
 
   /* The tag: kraft card hung on twine from the top of the screen, swaying a little. */
   .card-tag {
-    --twine: clamp(96px, 13lvh, 140px);
+    --twine: clamp(96px, 13dvh, 140px);
     --eyelet: 46px;
-    --tag-w: clamp(280px, min(24vw, 38lvh), 400px);
+    --tag-w: clamp(280px, min(24vw, 38dvh), 400px);
     left: 50%;
     top: 0;
     width: var(--tag-w);
@@ -1482,11 +1491,11 @@
   }
 
   .tag-paper {
-    --photo-max: 34lvh;
+    --photo-max: 34dvh;
     position: relative;
     display: flex;
     flex-direction: column;
-    max-height: calc(100lvh - var(--twine) - var(--spacing-gutter));
+    max-height: calc(100dvh - var(--twine) - var(--spacing-gutter));
     padding: 5rem 1.5rem 1.5rem;
     background: #c9a77a url(/textures/paper-kraft.jpg) 0 0 / 420px auto;
     clip-path: polygon(24% 0, 76% 0, 100% 56px, 100% 100%, 0 100%, 0 56px);
@@ -1592,8 +1601,8 @@
     }
 
     .recipe-paper {
-      --photo-max: 30svh;
-      max-height: 86svh;
+      --photo-max: 30dvh;
+      max-height: 86dvh;
       padding: 3rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
     }
 
@@ -1604,8 +1613,8 @@
     }
 
     .tag-paper {
-      --photo-max: 28svh;
-      max-height: calc(100svh - var(--twine) - var(--spacing-gutter));
+      --photo-max: 28dvh;
+      max-height: calc(100dvh - var(--twine) - var(--spacing-gutter));
     }
 
     .card-tag {
@@ -1692,12 +1701,13 @@
     background: var(--color-bark) url(/textures/wood-board.jpg) center / cover;
   }
 
+  /* Heading on top, the foot (total, the demo note, the order button) always in sight, only the list between them scrolls. */
   .basket-paper {
     position: relative;
+    display: flex;
+    flex-direction: column;
     max-height: calc(100dvh - var(--top) - var(--spacing-gutter) - 40px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
+    overflow: hidden;
     padding: 2.75rem 1.75rem 1.75rem;
     background: var(--color-cream) url(/textures/paper-cream.jpg) 0 0 / 480px auto;
   }
@@ -1747,6 +1757,16 @@
 
   .basket-close:hover {
     transform: rotate(90deg);
+  }
+
+  .basket-title,
+  .basket-end {
+    flex: none;
+  }
+
+  .basket-body {
+    margin-inline: -0.25rem;
+    padding-inline: 0.25rem;
   }
 
   .basket-title {
@@ -2014,7 +2034,7 @@
     }
 
     .basket-paper {
-      max-height: 86svh;
+      max-height: calc(86dvh - 10px);
       padding: 2.5rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
     }
 
@@ -2115,9 +2135,18 @@
     pointer-events: auto;
   }
 
+  /* The ticket in the middle, the words and links under it always in sight. */
+  .pass-body {
+    display: flex;
+    width: 100%;
+    pointer-events: none;
+  }
+
   .pass-fit {
     flex: none;
     position: relative;
+    margin: auto;
+    pointer-events: auto;
   }
 
   .pass-motion {
@@ -2255,6 +2284,7 @@
   }
 
   .pass-foot {
+    flex: none;
     display: grid;
     justify-items: center;
     gap: 0.75rem;
