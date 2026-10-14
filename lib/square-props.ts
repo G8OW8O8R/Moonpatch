@@ -90,16 +90,37 @@ export function visiblePlate(viewport: Size): Rect {
 /** Plate pixels per CSS pixel at rest. */
 const platePerCss = (viewport: Size) => 1 / squareFrame(viewport, { dusk: 1, wander: 0 }).base.scale;
 
-/** Window of a layer at this nearness at the end of the closing push-in, which carries near things outwards. */
-const endWindow = (viewport: Size, nearness: number) => windowAt(squareFrame(viewport, { dusk: 1, wander: 1 }), nearness);
+/**
+ * Window of a prop standing at `foot` (plate px), at its nearness: it grows
+ * faster than the plate as the camera closes in (its parallax), but about the
+ * point where it meets the ground, which stays on the very plate pixel it
+ * stands on. Every further camera move (the push-in on a door, the pan) is
+ * laid over prop and plate alike, so the foot never slides on the ground.
+ */
+export function propWindow(frame: SquareFrame, nearness: number, foot: Vec2): PlateWindow {
+  const plate = windowAt(frame, 1);
+  const { scale } = windowAt(frame, nearness);
+  return {
+    scale,
+    origin: {
+      x: plate.origin.x + (plate.scale - scale) * foot.x,
+      y: plate.origin.y + (plate.scale - scale) * foot.y,
+    },
+  };
+}
+
+/** The square's frame at the end of the closing push-in. */
+const endFrame = (viewport: Size) => squareFrame(viewport, { dusk: 1, wander: 1 });
 
 /**
- * Furthest right a point at this nearness may stand (plate x) and still be
- * `margin` CSS px inside the screen at the end of the push-in.
+ * Furthest right a prop's foot may stand (plate x) for a point `reach` plate
+ * px right of it to stay `margin` CSS px inside the screen at the end of the
+ * push-in, the prop growing about its foot at this nearness.
  */
-export function rightLimit(viewport: Size, nearness: number, margin: number): number {
-  const w = endWindow(viewport, nearness);
-  return (viewport.width - margin - w.origin.x) / w.scale;
+export function rightLimit(viewport: Size, nearness: number, margin: number, reach = 0): number {
+  const frame = endFrame(viewport);
+  const plate = windowAt(frame, 1);
+  return (viewport.width - margin - reach * windowAt(frame, nearness).scale - plate.origin.x) / plate.scale;
 }
 
 /** Post height per unit of arm width. */
@@ -133,7 +154,9 @@ export function propPlacement(viewport: Size): PropPlacement {
   const bottom = view.y + view.h;
   if (viewport.width / viewport.height < 4 / 5) {
     const nearness = 1.5;
-    const end = endWindow(viewport, nearness);
+    const frame = endFrame(viewport);
+    const end = windowAt(frame, nearness);
+    const plate = windowAt(frame, 1);
     // Arms 48 CSS px tall where the screen allows, never under 44: the whole arm is the button.
     const armFor = (cssHeight: number) => (cssHeight * perCss * ARM.width) / ARM.height;
     const halfSpan = (arm: number) => armReach(arm, arm * POST_PER_ARM) * end.scale;
@@ -142,7 +165,8 @@ export function propPlacement(viewport: Size): PropPlacement {
     const height = arm * POST_PER_ARM;
     return {
       sign: {
-        x: (viewport.width / 2 - end.origin.x) / end.scale,
+        // The post's foot in the middle of the screen at the end of the push-in.
+        x: (viewport.width / 2 - plate.origin.x) / plate.scale,
         ground: Math.min(PLATE.height - 18, bottom - 10 * perCss),
         height,
         arm,
@@ -158,7 +182,7 @@ export function propPlacement(viewport: Size): PropPlacement {
   const height = Math.min(300 * POST_PER_ARM, ground - BELOW_WINDOWS);
   const arm = height / POST_PER_ARM;
   return {
-    sign: { x: Math.min(2140, rightLimit(viewport, nearness, 24) - armReach(arm, height)), ground, height, arm, nearness },
+    sign: { x: Math.min(2140, rightLimit(viewport, nearness, 24, armReach(arm, height))), ground, height, arm, nearness },
     // In the left foreground on the edge of the road, right of the barn doors and above the tagline.
     // Its feet stay above the tagline's block, whatever share of the ground the screen shows.
     board: { x: 830, ground: Math.min(1100, bottom - 200 * perCss), height: 420, nearness: 1.6 },
@@ -170,6 +194,8 @@ export interface PropQuad {
   /** Rectangle on the plate, before any turn. */
   rect: Rect;
   nearness: number;
+  /** Where the prop it belongs to meets the ground (plate px): its window grows about this point. */
+  foot: Vec2;
   /** Arms turn about their nail (plate px). */
   pivot?: Vec2;
 }
@@ -181,18 +207,27 @@ export interface ContactShadow {
   rx: number;
   ry: number;
   nearness: number;
+  /** The foot of the prop that casts it. */
+  foot: Vec2;
   strength: number;
 }
 
 const armHeight = (width: number) => (width * ARM.height) / ARM.width;
+
+/** Where the signpost's post meets the ground, plate px. */
+export const signFoot = (sign: SignPlacement): Vec2 => ({ x: sign.x, y: sign.ground });
+
+/** Between the notice board's legs on the ground, plate px. */
+export const boardFoot = (board: BoardPlacement): Vec2 => ({ x: board.x, y: board.ground });
 
 /** The signpost as quads: the post, then the three arms stacked down it. */
 export function signQuads(sign: SignPlacement): PropQuad[] {
   const postWidth = postWidthOf(sign.height);
   const top = sign.ground - sign.height;
   const h = armHeight(sign.arm);
+  const foot = signFoot(sign);
   const quads: PropQuad[] = [
-    { id: "post", rect: { x: sign.x - postWidth / 2, y: top, w: postWidth, h: sign.height }, nearness: sign.nearness },
+    { id: "post", rect: { x: sign.x - postWidth / 2, y: top, w: postWidth, h: sign.height }, nearness: sign.nearness, foot },
   ];
   ARMS.forEach((arm, i) => {
     // The nail sits on the post's face, towards the arm's butt end.
@@ -202,6 +237,7 @@ export function signQuads(sign: SignPlacement): PropQuad[] {
       id: `arm-${arm.id}`,
       rect: { x: nail.x - arm.nail.x * sign.arm, y: nail.y - arm.nail.y * h, w: sign.arm, h },
       nearness: sign.nearness,
+      foot,
       pivot: nail,
     });
   });
@@ -210,7 +246,7 @@ export function signQuads(sign: SignPlacement): PropQuad[] {
 
 export function boardQuad(board: BoardPlacement): PropQuad {
   const w = (board.height * BOARD.width) / BOARD.height;
-  return { id: "board", rect: { x: board.x - w / 2, y: board.ground - board.height, w, h: board.height }, nearness: board.nearness };
+  return { id: "board", rect: { x: board.x - w / 2, y: board.ground - board.height, w, h: board.height }, nearness: board.nearness, foot: boardFoot(board) };
 }
 
 /**
@@ -246,18 +282,21 @@ export function contactShadows(placement: PropPlacement): ContactShadow[] {
   const postWidth = (sign.height * POST.width) / POST.height;
   const boardScale = board.height / BOARD.height;
   const boardLeft = board.x - (BOARD.width * boardScale) / 2;
+  const atSign = signFoot(sign);
+  const atBoard = boardFoot(board);
   return [
-    { x: sign.x, y: sign.ground - 2, rx: postWidth * 1.25, ry: postWidth * 0.22, nearness: sign.nearness, strength: 0.55 },
+    { x: sign.x, y: sign.ground - 2, rx: postWidth * 1.25, ry: postWidth * 0.22, nearness: sign.nearness, foot: atSign, strength: 0.55 },
     ...BOARD_PARTS.feet.map((foot) => ({
       x: boardLeft + foot.x * boardScale,
       y: board.ground - 2,
       rx: 160 * boardScale,
       ry: 36 * boardScale,
       nearness: board.nearness,
+      foot: atBoard,
       strength: 0.5,
     })),
     // The roof and body throw a broad soft patch between the legs.
-    { x: board.x, y: board.ground - 4, rx: BOARD.width * boardScale * 0.62, ry: 70 * boardScale, nearness: board.nearness, strength: 0.22 },
+    { x: board.x, y: board.ground - 4, rx: BOARD.width * boardScale * 0.62, ry: 70 * boardScale, nearness: board.nearness, foot: atBoard, strength: 0.22 },
   ];
 }
 
@@ -311,7 +350,7 @@ export function openedBoardSizes(): string {
  */
 export function visitShift(viewport: Size, frame: SquareFrame, placement: PropPlacement, progress: number, nearness: number): Shift {
   const quad = boardQuad(placement.board);
-  const from = quadOnScreen(windowAt(frame, placement.board.nearness), quad.rect);
+  const from = quadOnScreen(propWindow(frame, quad.nearness, quad.foot), quad.rect);
   const to = openedBoard(viewport);
   const e = Math.min(1, Math.max(0, progress));
   const about = { x: from.x + from.w / 2, y: from.y + from.h / 2 };
@@ -354,20 +393,20 @@ export function propsOnScreen(
 ): { props: Record<PropQuad["id"], PropOnScreen>; shadows: ShadowOnScreen[]; plate: PlateWindow } {
   const frame = squareFrame(viewport, view, options);
   const placement = propPlacement(viewport);
-  const windowFor = (nearness: number): PlateWindow => {
-    const w = windowAt(frame, nearness);
+  const windowFor = (nearness: number, foot?: Vec2): PlateWindow => {
+    const w = foot ? propWindow(frame, nearness, foot) : windowAt(frame, nearness);
     return view.visit > 0 ? shiftWindow(w, visitShift(viewport, frame, placement, view.visit, nearness)) : w;
   };
   const props = {} as Record<PropQuad["id"], PropOnScreen>;
   for (const quad of [...signQuads(placement.sign), boardQuad(placement.board)]) {
-    const w = windowFor(quad.nearness);
+    const w = windowFor(quad.nearness, quad.foot);
     props[quad.id] = {
       rect: quadOnScreen(w, quad.rect),
       ...(quad.pivot ? { pivot: onScreen(w, quad.pivot.x, quad.pivot.y) } : {}),
     };
   }
   const shadows = contactShadows(placement).map((s) => {
-    const w = windowFor(s.nearness);
+    const w = windowFor(s.nearness, s.foot);
     const c = onScreen(w, s.x, s.y);
     return { x: c.x, y: c.y, rx: s.rx * w.scale, ry: s.ry * w.scale, strength: s.strength };
   });

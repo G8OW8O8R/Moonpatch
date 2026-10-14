@@ -38,6 +38,14 @@ import { GRAIN_FPS, GrainPass } from "./grain";
 import { type RoomImages, RoomRenderer } from "./RoomRenderer";
 import { type SquareImages, SquareRenderer, type SquareState } from "./SquareRenderer";
 
+/** Share of the gate's opening over which the props, absent from the closed gate's poster, come into the scene. */
+const PROPS_IN = 0.1;
+
+const smoothstep = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
 /** Where the scene stands: out on the square, or inside one of the buildings. */
 export type ScenePlace = "square" | RoomId;
 
@@ -340,7 +348,10 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     const dt = lastFrame ? Math.min(0.05, (now - lastFrame) / 1000) : 0;
     lastFrame = now;
 
-    opening = followOpening(opening, Math.min(1, Math.max(0, progress / params.openEnd)), dt, params);
+    // The leaves stay open while the camera is anywhere past the gate: the way back is the ride
+    // played backwards, out through the open gate, and only then do the leaves close behind it.
+    const openTarget = ride > 0 ? 1 : Math.min(1, Math.max(0, progress / params.openEnd));
+    opening = followOpening(opening, openTarget, dt, params);
     const riding = ride !== rideTarget;
     if (riding) {
       const step = dt / params.rideDuration;
@@ -440,8 +451,19 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     // and the lights' flicker, every frame of film.
     if (busy || !onSquare || now - lastStill >= 1000 / GRAIN_FPS - 4) {
       lastStill = now;
-      if (onSquare) squareRenderer!.render(setup.debugLayer === "plate" ? { ...square, props: 0 } : square, css, renderer.devicePixelRatio, seconds, renderer.size);
-      else renderer.render({ opening: opening.value, ride }, params, riding);
+      if (onSquare) squareRenderer!.render(square, css, renderer.devicePixelRatio, seconds, renderer.size, { bare: setup.debugLayer === "plate" });
+      else {
+        const standing = squareRenderer && setup.debugLayer !== "plate" ? squareRenderer : null;
+        const size = renderer.size;
+        const ratio = renderer.devicePixelRatio;
+        renderer.render(
+          { opening: opening.value, ride },
+          params,
+          riding,
+          // The signpost and the board stand on the square from the moment the leaves start to part.
+          standing ? (window, open) => standing.renderStanding(window, css, ratio, seconds, size, smoothstep(0, PROPS_IN, open)) : undefined,
+        );
+      }
       // The closed gate is the poster itself; grain comes in along the ride and stays on the square.
       // Over the opened board the page lays the same film itself, over its cards as well.
       const dpr = renderer.devicePixelRatio;

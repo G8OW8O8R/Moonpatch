@@ -10,7 +10,7 @@ import type { Locale } from "@/lib/i18n";
 import type { Messages } from "@/lib/messages";
 import { ROOM_REST_ZOOM, roomBox } from "@/lib/plate-box";
 import { type Pan, dragLook, flickVelocity, glide, pans } from "@/lib/room-pan";
-import { ROOMS, type RoomId, isRoomId } from "@/lib/rooms";
+import { ROOMS, ROOM_ROW, type RoomId, isRoomId } from "@/lib/rooms";
 import { placeAt, placePath } from "@/lib/routes";
 import { type ArmId, propsOnScreen } from "@/lib/square-props";
 import { DUSK, type Track, defaultTrack, trackAt, trackEnd, trackLength } from "@/lib/square-rig";
@@ -574,12 +574,18 @@ export function GateScene({
     else el.dataset.away = "";
   }, []);
 
-  /** The room's own copy (and its picture), hidden the moment the way out begins. */
+  /** The room's own copy (and its picture), hidden the moment the way out begins: its name goes first. */
   const showRoomLayer = useCallback((shown: boolean) => {
-    for (const el of [roomLayer.current, roomPlate.current]) {
-      if (!el) continue;
-      el.inert = !shown;
-      el.style.opacity = shown ? "" : "0";
+    const layer = roomLayer.current;
+    if (layer) {
+      layer.inert = !shown;
+      if (shown) delete layer.dataset.leaving;
+      else layer.dataset.leaving = "";
+    }
+    const plate = roomPlate.current;
+    if (plate) {
+      plate.inert = !shown;
+      plate.style.opacity = shown ? "" : "0";
     }
   }, []);
 
@@ -761,14 +767,25 @@ export function GateScene({
     [goTo],
   );
 
-  // Esc leaves a building, or turns the way in around before it lands.
+  // Esc leaves a building, or turns the way in around before it lands; the arrow keys walk the
+  // corridor to the building next door, in the order they stand on the square.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !boardOpenRef.current && (awayRef.current || placeRef.current !== "square")) leaveRoom();
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.defaultPrevented || boardOpenRef.current) return;
+      const here = placeRef.current;
+      if (!isRoomId(here)) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable], [role=dialog]")) return;
+      const next = ROOM_ROW[ROOM_ROW.indexOf(here) + (event.key === "ArrowRight" ? 1 : -1)];
+      if (!next) return;
+      event.preventDefault();
+      goTo(next);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [leaveRoom]);
+  }, [leaveRoom, goTo]);
 
   /** Looks somewhere else in the room: the scene, and the room's picture where it stands in for it. */
   const lookAt = useCallback((look: number) => {
@@ -1077,6 +1094,7 @@ export function GateScene({
             lang={square.lang}
             t={square.rooms}
             hint={hint}
+            arrived={settledInPage}
             onBack={onBack}
             onNextDoor={onNextDoor}
           />

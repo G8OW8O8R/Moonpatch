@@ -3,6 +3,7 @@ import {
   EYE_HEIGHT,
   GATE_GROUND_Y,
   type LeafSide,
+  type PlateWindow,
   PRINCIPAL,
   type RigParams,
   type SceneState,
@@ -231,8 +232,11 @@ export class GateRenderer {
     return { width: this.canvas.width, height: this.canvas.height };
   }
 
-  /** Draws one frame of the scene; `riding` while the timed ride is under way. */
-  render(state: SceneState, params: RigParams, riding: boolean) {
+  /**
+   * Draws one frame of the scene; `riding` while the timed ride is under way. `standing` draws what
+   * stands on the square in the square plate's window of this frame, before anything nearer.
+   */
+  render(state: SceneState, params: RigParams, riding: boolean, standing?: (window: PlateWindow, opening: number) => void) {
     const { gl } = this;
     const camera = cameraAt(state, this.css, params);
     const width = this.canvas.width;
@@ -256,6 +260,10 @@ export class GateRenderer {
     // The square, far behind everything.
     gl.disable(gl.BLEND);
     this.drawBackdrop(camera.window.origin, camera.window.scale, dissolve, under, 1);
+    if (standing) {
+      standing(camera.window, opening);
+      gl.disable(gl.BLEND);
+    }
 
     // Shadows of the leaves on the road beyond the gate line.
     const shadowStrength = params.shadowOpacity * smoothstep(0, 0.25, opening);

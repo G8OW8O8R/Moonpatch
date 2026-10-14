@@ -10,13 +10,19 @@ import {
   intersects,
   openedBoard,
   openedBoardSizes,
+  boardFoot,
+  contactShadows,
   propPlacement,
+  propWindow,
   propsOnScreen,
   quadOnScreen,
+  signFoot,
   signQuads,
   visitShift,
 } from "./square-props";
-import { squareFrame, windowAt } from "./square-rig";
+import { type Shift, onScreen, shiftWindow, squareFrame, windowAt } from "./square-rig";
+import { defaultDoor, doorShift, legAt } from "./door-rig";
+import { ROOM_ROW } from "./rooms";
 
 const landscape = [
   { width: 1536, height: 864 },
@@ -158,7 +164,7 @@ describe("the opened board", () => {
     const placement = propPlacement(viewport);
     const frame = squareFrame(viewport, { dusk: 1, wander: 1 });
     const quad = boardQuad(placement.board);
-    const base = windowAt(frame, quad.nearness);
+    const base = propWindow(frame, quad.nearness, quad.foot);
     const shift = visitShift(viewport, frame, placement, 1, quad.nearness);
     const scaled = {
       scale: base.scale * shift.scale,
@@ -184,5 +190,66 @@ describe("the opened board", () => {
     const plate = visitShift(viewport, frame, placement, 1, 1);
     expect(board.scale).toBeGreaterThan(plate.scale);
     expect(plate.scale).toBeGreaterThan(1);
+  });
+});
+
+describe("standing on the ground", () => {
+  /** Furthest a prop's foot may slide on the plate under it, CSS px. */
+  const SLIP = 0.5;
+
+  /** Every camera move the square makes: dusk's pan, the closing push-in, and the push-in on each door. */
+  const moves = (viewport: { width: number; height: number }) => {
+    const views: Array<{ dusk: number; wander: number; camera?: Shift }> = [];
+    for (let dusk = 0; dusk <= 1.0001; dusk += 0.125) views.push({ dusk, wander: 0 });
+    for (let wander = 0; wander <= 1.0001; wander += 0.125) views.push({ dusk: 1, wander });
+    const base = windowAt(squareFrame(viewport, { dusk: 1, wander: 1 }));
+    for (const room of ROOM_ROW) {
+      for (let ms = 0; ms <= defaultDoor.cutAt * defaultDoor.duration * 1000; ms += 20) {
+        views.push({ dusk: 1, wander: 1, camera: doorShift(viewport, base, room, legAt(1, ms / 1000).j) });
+      }
+    }
+    return views;
+  };
+
+  it.each(all)("keeps each prop's foot on its plate pixel through every camera move at $width×$height", (viewport) => {
+    const placement = propPlacement(viewport);
+    const feet = [
+      ...[...signQuads(placement.sign), boardQuad(placement.board)].map((q) => ({ id: q.id, nearness: q.nearness, foot: q.foot })),
+      ...contactShadows(placement).map((s, i) => ({ id: `shadow ${i}`, nearness: s.nearness, foot: s.foot })),
+    ];
+    for (const view of moves(viewport)) {
+      const frame = squareFrame(viewport, view);
+      const lay = (w: ReturnType<typeof windowAt>) => (view.camera ? shiftWindow(w, view.camera) : w);
+      const plate = lay(windowAt(frame, 1));
+      for (const { id, nearness, foot } of feet) {
+        const onPlate = onScreen(plate, foot.x, foot.y);
+        const onProp = onScreen(lay(propWindow(frame, nearness, foot)), foot.x, foot.y);
+        const slip = Math.hypot(onProp.x - onPlate.x, onProp.y - onPlate.y);
+        expect(slip, `${id} at dusk ${view.dusk.toFixed(2)}, wander ${view.wander.toFixed(2)}`).toBeLessThanOrEqual(SLIP);
+      }
+    }
+  });
+
+  it.each(all)("draws the post and the board standing on those feet at $width×$height", (viewport) => {
+    const placement = propPlacement(viewport);
+    for (const view of moves(viewport).filter((v) => !v.camera)) {
+      const { props, plate } = propsOnScreen(viewport, { ...view, visit: 0 });
+      for (const [id, foot] of [
+        ["post", signFoot(placement.sign)],
+        ["board", boardFoot(placement.board)],
+      ] as const) {
+        const { rect } = props[id];
+        const ground = onScreen(plate, foot.x, foot.y);
+        expect(Math.abs(rect.x + rect.w / 2 - ground.x), id).toBeLessThanOrEqual(SLIP);
+        expect(Math.abs(rect.y + rect.h - ground.y), id).toBeLessThanOrEqual(SLIP);
+      }
+    }
+  });
+
+  it("still grows nearer props faster than the plate as the camera closes in", () => {
+    const viewport = { width: 1536, height: 864 };
+    const placement = propPlacement(viewport);
+    const frame = squareFrame(viewport, { dusk: 1, wander: 1 });
+    expect(propWindow(frame, placement.sign.nearness, signFoot(placement.sign)).scale).toBeGreaterThan(windowAt(frame, 1).scale);
   });
 });

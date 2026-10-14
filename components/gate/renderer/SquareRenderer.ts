@@ -14,15 +14,17 @@ import {
   BOARD,
   CAST,
   PROP_TINT as TINT,
+  type PropPlacement,
   type PropQuad,
   boardQuad,
   castShadow,
   contactShadows,
   propPlacement,
+  propWindow,
   signQuads,
   visitShift,
 } from "@/lib/square-props";
-import { type Shift, flicker, gradeAt, lightLevel, shiftWindow, squareFrame, windowAt } from "@/lib/square-rig";
+import { type Shift, type Vec2, flicker, gradeAt, lightLevel, shiftWindow, squareFrame, windowAt } from "@/lib/square-rig";
 import lightsManifest from "@/components/square/lights.json";
 import {
   type Corner,
@@ -52,7 +54,7 @@ export interface SquareState {
   arms: Record<ArmId, number>;
   /** How far each arm and the board are pointed at (hover, focus), 0–1. */
   pointed: Record<ArmId | "board", number>;
-  /** Fade of the props after the ride, 0–1. */
+  /** The props answer the pointer (they always stand in the scene; this only matters to the page). */
   props: number;
 }
 
@@ -124,6 +126,12 @@ const smoothstep = (a: number, b: number, x: number) => {
   return t * t * (3 - 2 * t);
 };
 
+/** A prop's window for its nearness and foot. */
+type WindowFor = (nearness: number, foot: Vec2) => PlateWindow;
+
+/** Props that arrive after the scene is already on screen come in over this long, ms. */
+const LATE_ARRIVAL = 400;
+
 export class SquareRenderer {
   private readonly gl: GL;
   private readonly plate: Program;
@@ -145,6 +153,8 @@ export class SquareRenderer {
   private readonly props = new Map<PropQuad["id"], WebGLTexture>();
   private readonly labels = new Map<ArmId, WebGLTexture>();
   private frame: Target | null = null;
+  /** When the props reached the GPU (performance.now()). */
+  private propsAt = 0;
 
   static async create(gl: GL, golden: WebGLTexture, frame: () => Promise<void>): Promise<SquareRenderer> {
     const programs = [
@@ -196,6 +206,7 @@ export class SquareRenderer {
       bitmap.close();
       await pause();
     }
+    this.propsAt = performance.now();
   }
 
   setLabel(arm: ArmId, bitmap: ImageBitmap) {
@@ -221,7 +232,7 @@ export class SquareRenderer {
     dpr: number,
     seconds: number,
     canvas: { width: number; height: number },
-    { into = null, camera }: { into?: WebGLFramebuffer | null; camera?: Shift } = {},
+    { into = null, camera, bare = false }: { into?: WebGLFramebuffer | null; camera?: Shift; bare?: boolean } = {},
   ) {
     const { gl } = this;
     const width = canvas.width;
@@ -229,11 +240,13 @@ export class SquareRenderer {
     const frame = squareFrame(css, state);
     const placement = propPlacement(css);
     const visit = state.visit;
-    const windowFor = (nearness: number): PlateWindow => {
-      const w = windowAt(frame, nearness);
+    const lay = (w: PlateWindow, nearness: number): PlateWindow => {
       const seen = visit > 0 ? shiftWindow(w, visitShift(css, frame, placement, visit, nearness)) : w;
       return camera ? shiftWindow(seen, camera) : seen;
     };
+    const plateWindow = lay(windowAt(frame, 1), 1);
+    // Each prop grows about its own foot, which stays on its plate pixel through every move.
+    const windowFor: WindowFor = (nearness, foot) => lay(propWindow(frame, nearness, foot), nearness);
 
     this.updateLevels(state.dusk, seconds);
 
@@ -254,63 +267,15 @@ export class SquareRenderer {
     gl.disable(gl.BLEND);
 
     const grade = gradeAt(state.dusk);
-    this.drawPlate(windowFor(1), grade, dpr, width, height, visit);
+    this.drawPlate(plateWindow, grade, dpr, width, height, visit);
 
-    const propsAlpha = this.props.size ? state.props : 0;
-    const sign = signQuads(placement.sign);
-    const board = boardQuad(placement.board);
+    // The props stand in the scene from the ride on; only light changes on them.
+    const propsAlpha = bare ? 0 : this.propsAlpha();
     const scene: SceneLight = { grade, dpr, width, height };
     if (propsAlpha > 0.001) {
-      gl.enable(gl.BLEND);
-      // Shadows first, multiplied into the ground: the soft dark at each foot, then what the low sun throws.
-      gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_COLOR);
-      const c = this.contact;
-      gl.useProgram(c.program);
-      gl.uniform2f(c.uniform("uViewport"), width, height);
-      for (const shadow of contactShadows(placement)) {
-        const w = windowFor(shadow.nearness);
-        gl.uniform1f(c.uniform("uStrength"), shadow.strength * propsAlpha * (1 - visit));
-        this.drawRect(w, { x: shadow.x - shadow.rx, y: shadow.y - shadow.ry, w: shadow.rx * 2, h: shadow.ry * 2 }, dpr);
-      }
-      const cast = CAST.strength * (1 - grade) * propsAlpha * (1 - visit);
-      if (cast > 0.001) {
-        const p = this.cast;
-        gl.useProgram(p.program);
-        gl.uniform2f(p.uniform("uViewport"), width, height);
-        gl.uniform1f(p.uniform("uStrength"), cast);
-        for (const quad of [sign[0]!, board]) {
-          const texture = this.props.get(quad.id);
-          if (!texture) continue;
-          this.bind(p, "uTexture", texture, 0);
-          const w = windowFor(quad.nearness);
-          const [tl, tr, bl, br] = castShadow(quad.rect).map(
-            (pt, i): Corner => ({
-              x: (w.origin.x + w.scale * pt.x) * dpr,
-              y: (w.origin.y + w.scale * pt.y) * dpr,
-              z: 0,
-              u: i % 2,
-              v: i < 2 ? 0 : 1,
-            }),
-          ) as [Corner, Corner, Corner, Corner];
-          drawQuad(gl, this.quad, [tl, tr, bl, br]);
-        }
-      }
-      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      this.drawShadows(placement, windowFor, scene, propsAlpha * (1 - visit));
       // The signpost in front, sharp or not: it stays behind the board when the board comes forward.
-      const warm = this.warmAt(placement.sign.x, placement.sign.ground - placement.sign.height * 0.6);
-      for (const quad of sign) {
-        const arm = quad.id.startsWith("arm-") ? (quad.id.slice(4) as ArmId) : null;
-        this.drawProp(quad, windowFor(quad.nearness), scene, {
-          alpha: propsAlpha,
-          angle: arm ? state.arms[arm] : 0,
-          pointed: arm ? state.pointed[arm] : 0,
-          warm,
-          label: arm ? this.labels.get(arm) : undefined,
-          paint: SIGN_PAINT,
-          wear: 1,
-          sign: true,
-        });
-      }
+      this.drawSign(placement, windowFor, scene, state, propsAlpha);
     }
 
     if (defocus && this.frame) {
@@ -328,26 +293,30 @@ export class SquareRenderer {
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     }
 
-    // The board, sharp, on top: it is what the camera moves onto. Its lantern comes on with the
-    // lights, and burns whenever the board is open.
-    if (propsAlpha > 0.001 || visit > 0) {
-      gl.enable(gl.BLEND);
-      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-      const lit = Math.max(lightLevel(LANTERN.order, state.dusk), visit);
-      this.drawProp(board, windowFor(board.nearness), scene, {
-        alpha: Math.max(propsAlpha, visit),
-        angle: 0,
-        pointed: state.pointed.board * (1 - visit),
-        warm: this.warmAt(placement.board.x, placement.board.ground - placement.board.height * 0.6),
-        label: this.writing ?? undefined,
-        paint: PENCIL,
-        wear: 0,
-        // The writing goes as the camera arrives; the cards up close carry the real words.
-        labelAmount: 1 - smoothstep(0.35, 0.9, visit),
-        open: visit,
-        lantern: lit * flicker(LANTERN.flickerId, seconds, LANTERN.flickerDepth),
-      });
-    }
+    // The board, sharp, on top: it is what the camera moves onto.
+    if (propsAlpha > 0.001 || visit > 0) this.drawBoard(placement, windowFor, scene, state, Math.max(propsAlpha, visit), seconds);
+    gl.disable(gl.BLEND);
+  }
+
+  /**
+   * The signpost and the board as the ride through the gate sees them: on the golden plate, in the
+   * plate's own window (the ride moves them exactly as the plate), lit as the square lights them at
+   * the start of dusk. Drawn straight after the square, behind the road, the leaves and the arch.
+   */
+  renderStanding(window: PlateWindow, css: Size, dpr: number, seconds: number, canvas: { width: number; height: number }, alpha: number) {
+    const shown = alpha * this.propsAlpha();
+    if (shown <= 0.001 || !this.ready) return;
+    const { gl } = this;
+    this.updateLevels(0, seconds);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    const placement = propPlacement(css);
+    const windowFor: WindowFor = () => window;
+    const scene: SceneLight = { grade: 0, dpr, width: canvas.width, height: canvas.height };
+    const state = restingSquare;
+    this.drawShadows(placement, windowFor, scene, shown);
+    this.drawSign(placement, windowFor, scene, state, shown);
+    this.drawBoard(placement, windowFor, scene, state, shown, seconds);
     gl.disable(gl.BLEND);
   }
 
@@ -361,6 +330,94 @@ export class SquareRenderer {
   }
 
   // ------------------------------------------------------------ internals
+
+  /** The props are on the GPU (and, if they came late, have had their moment to arrive). */
+  private propsAlpha(): number {
+    if (!this.props.size) return 0;
+    return Math.min(1, (performance.now() - this.propsAt) / LATE_ARRIVAL);
+  }
+
+  /** Shadows, multiplied into the ground: the soft dark at each foot, then what the low sun throws. */
+  private drawShadows(placement: PropPlacement, windowFor: WindowFor, scene: SceneLight, alpha: number) {
+    const { gl } = this;
+    const { dpr, width, height, grade } = scene;
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_COLOR);
+    const c = this.contact;
+    gl.useProgram(c.program);
+    gl.uniform2f(c.uniform("uViewport"), width, height);
+    for (const shadow of contactShadows(placement)) {
+      const w = windowFor(shadow.nearness, shadow.foot);
+      gl.uniform1f(c.uniform("uStrength"), shadow.strength * alpha);
+      this.drawRect(w, { x: shadow.x - shadow.rx, y: shadow.y - shadow.ry, w: shadow.rx * 2, h: shadow.ry * 2 }, dpr);
+    }
+    const cast = CAST.strength * (1 - grade) * alpha;
+    if (cast > 0.001) {
+      const p = this.cast;
+      gl.useProgram(p.program);
+      gl.uniform2f(p.uniform("uViewport"), width, height);
+      gl.uniform1f(p.uniform("uStrength"), cast);
+      for (const quad of [signQuads(placement.sign)[0]!, boardQuad(placement.board)]) {
+        const texture = this.props.get(quad.id);
+        if (!texture) continue;
+        this.bind(p, "uTexture", texture, 0);
+        const w = windowFor(quad.nearness, quad.foot);
+        const [tl, tr, bl, br] = castShadow(quad.rect).map(
+          (pt, i): Corner => ({
+            x: (w.origin.x + w.scale * pt.x) * dpr,
+            y: (w.origin.y + w.scale * pt.y) * dpr,
+            z: 0,
+            u: i % 2,
+            v: i < 2 ? 0 : 1,
+          }),
+        ) as [Corner, Corner, Corner, Corner];
+        drawQuad(gl, this.quad, [tl, tr, bl, br]);
+      }
+    }
+  }
+
+  private drawSign(placement: PropPlacement, windowFor: WindowFor, scene: SceneLight, state: SquareState, alpha: number) {
+    const { gl } = this;
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    const warm = this.warmAt(placement.sign.x, placement.sign.ground - placement.sign.height * 0.6);
+    for (const quad of signQuads(placement.sign)) {
+      const arm = quad.id.startsWith("arm-") ? (quad.id.slice(4) as ArmId) : null;
+      this.drawProp(quad, windowFor(quad.nearness, quad.foot), scene, {
+        alpha,
+        angle: arm ? state.arms[arm] : 0,
+        pointed: arm ? state.pointed[arm] : 0,
+        warm,
+        label: arm ? this.labels.get(arm) : undefined,
+        paint: SIGN_PAINT,
+        wear: 1,
+        sign: true,
+      });
+    }
+  }
+
+  /** The board; its lantern comes on with the lights, and burns whenever the board is open. */
+  private drawBoard(placement: PropPlacement, windowFor: WindowFor, scene: SceneLight, state: SquareState, alpha: number, seconds: number) {
+    const { gl } = this;
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    const visit = state.visit;
+    const board = boardQuad(placement.board);
+    const lit = Math.max(lightLevel(LANTERN.order, state.dusk), visit);
+    this.drawProp(board, windowFor(board.nearness, board.foot), scene, {
+      alpha,
+      angle: 0,
+      pointed: state.pointed.board * (1 - visit),
+      warm: this.warmAt(placement.board.x, placement.board.ground - placement.board.height * 0.6),
+      label: this.writing ?? undefined,
+      paint: PENCIL,
+      wear: 0,
+      // The writing goes as the camera arrives; the cards up close carry the real words.
+      labelAmount: 1 - smoothstep(0.35, 0.9, visit),
+      open: visit,
+      lantern: lit * flicker(LANTERN.flickerId, seconds, LANTERN.flickerDepth),
+    });
+  }
 
   private updateLevels(dusk: number, seconds: number) {
     const data = this.levelData;

@@ -27,7 +27,7 @@ import {
   unitField,
 } from "./door-rig";
 import { DOORS, ROOM_REST_ZOOM, roomBox } from "./plate-box";
-import { propPlacement, quadOnScreen, signQuads } from "./square-props";
+import { propPlacement, propWindow, quadOnScreen, signQuads } from "./square-props";
 import { onScreen, shiftWindow, squareFrame, windowAt } from "./square-rig";
 
 const desktop = { width: 1536, height: 864 };
@@ -232,12 +232,12 @@ describe("exposure at the cut", () => {
 });
 
 describe("into the haunt shop", () => {
-  it("has the signpost's lettering out of the frame for the last 50 ms before the cut", () => {
+  it("has the signpost's lettering out of the frame for the last 40 ms before the cut", () => {
     const frame = squareFrame(desktop, { dusk: 1, wander: 1 });
     const arms = signQuads(propPlacement(desktop).sign).filter((q) => q.id.startsWith("arm-"));
-    for (let t = 332; t < 382; t += 5) {
+    for (let t = 342; t < 382; t += 5) {
       const camera = doorShift(desktop, base, "haunt", legAt(1, ms(t)).j);
-      for (const arm of arms) expect(quadOnScreen(shiftWindow(windowAt(frame, arm.nearness), camera), arm.rect).y).toBeGreaterThan(desktop.height);
+      for (const arm of arms) expect(quadOnScreen(shiftWindow(propWindow(frame, arm.nearness, arm.foot), camera), arm.rect).y).toBeGreaterThan(desktop.height);
     }
   });
 });

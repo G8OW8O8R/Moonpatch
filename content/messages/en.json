@@ -41,7 +41,8 @@
   },
   "rooms": {
     "back": "Back to the square",
-    "nextDoor": "Next door",
+    "plaque": "Moonpatch Farm · No. {n}",
+    "corridor": "Buildings on the farm",
     "swipe": "Swipe to look around",
     "cafe": {
       "title": "Café",

@@ -67,7 +67,7 @@ test("in and out of a building with the browser's back and forward", async ({ pa
   // Next door: straight from one building to the other, and back with the browser.
   await page.goForward();
   await expect(backLink(page)).toBeVisible();
-  await page.getByRole("navigation", { name: "Café" }).getByRole("link", { name: "Haunt Shop" }).click();
+  await page.getByRole("navigation", { name: "Buildings on the farm" }).getByRole("link", { name: "Haunt Shop" }).click();
   await expect(page).toHaveURL(/\/en\/haunt$/);
   await expect(page).toHaveTitle("Haunt Shop · Moonpatch Farm");
   await page.goBack();
