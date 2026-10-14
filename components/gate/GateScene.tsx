@@ -662,7 +662,6 @@ export function GateScene({
         cardOpen.current = false;
         setCard(null);
       }
-      controller.current?.setSpot(null);
       cancelAnimationFrame(glideFrame.current);
       drag.current = null;
       const c = controller.current;
@@ -869,7 +868,6 @@ export function GateScene({
   }, [lookAt]);
   const unpoint = useCallback(() => controller.current?.setPointer(null), []);
 
-  const spot = useCallback((index: number | null) => controller.current?.setSpot(index), []);
   const openCard = useCallback((open: SeedOpen) => {
     cardOpen.current = true;
     setCard(open);
@@ -877,7 +875,6 @@ export function GateScene({
   const closeCard = useCallback(() => {
     cardOpen.current = false;
     setCard(null);
-    controller.current?.setSpot(null);
   }, []);
   const cardSeed = useCallback(
     () => (card ? (roomSeeds.current?.querySelector<HTMLElement>(`[data-product="${card.hotspot.product.id}"]`) ?? null) : null),
@@ -1131,10 +1128,8 @@ export function GateScene({
               lang={square.lang}
               t={square.product}
               roomTitle={square.rooms[inside].title}
-              lit={canvasShown}
               open={card?.hotspot.product.id ?? null}
               onOpen={openCard}
-              onSpot={spot}
             />
           </RoomUi>
         )}

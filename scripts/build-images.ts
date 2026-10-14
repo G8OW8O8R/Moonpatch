@@ -6,8 +6,10 @@
  *
  * public/plates/<name>.jpg → public/img/plates/<name>-<width>.{avif,webp}
  * at the plate's full width (2576 landscape, 2552 portrait) and at 1600px.
- * The tag's twine and grommet → public/img/textures/{twine,grommet}.webp:
- * a straight run of the twine (the source lies in a curve) and a small ring.
+ * The tag's twine and grommet and the pass's moon stamp →
+ * public/img/textures/{twine,grommet,stamp-moon}.webp: a straight run of the
+ * twine (the source lies in a curve), a small ring, a stamp twice as large as
+ * it is ever printed.
  * A room that grades its door leaves gets its picture from `pnpm rooms` instead.
  * Sources are never modified.
  */
@@ -83,6 +85,7 @@ async function buildTextures(): Promise<number> {
   const jobs: Array<{ name: string; make: (source: string) => Promise<Sharp> | Sharp }> = [
     { name: "twine", make: straightTwine },
     { name: "grommet", make: (source) => sharp(source).resize({ width: 160, kernel: "lanczos3" }) },
+    { name: "stamp-moon", make: (source) => sharp(source).resize({ width: 240, kernel: "lanczos3" }) },
   ];
   let built = 0;
   for (const { name, make } of jobs) {

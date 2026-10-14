@@ -89,9 +89,16 @@
     "kept": "{name} czeka na twoją wizytę.",
     "doneTitle": "Gotowe",
     "shipped": "Produkty do wysyłki byłyby już w drodze.",
-    "visitOn": "Do zobaczenia: {day} · {hours}",
     "hours": "10:00–20:00",
     "charged": "To sklep demo, nic nie zostało pobrane.",
-    "back": "Wróć na farmę"
+    "back": "Wróć na farmę",
+    "passTitle": "Karnet na farmę",
+    "passWaiting": "Czeka na ciebie w kawiarni:",
+    "passAdmit": "Wstęp · 1 osoba",
+    "passStamp": "Pieczątka z księżycem",
+    "passNote": "Pokaż to przy bramie. To sklep demo, nic nie zostało pobrane.",
+    "passSave": "Zapisz bilet",
+    "passSaved": "Bilet zapisany. Taczka znów jest pusta.",
+    "passFile": "moonpatch-karnet"
   }
 }

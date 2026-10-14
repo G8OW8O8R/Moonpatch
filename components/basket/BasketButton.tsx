@@ -9,7 +9,9 @@ import type { Locale } from "@/lib/i18n";
 import { type Messages, format } from "@/lib/messages";
 import { cubicBezier, duration, ease } from "@/lib/motion-tokens";
 import { productById } from "@/lib/products";
+import { type PassOrder } from "@/lib/farm-pass";
 import { BasketDialog } from "./BasketDialog";
+import { FarmPass } from "./FarmPass";
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -21,6 +23,8 @@ const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matc
 export function BasketButton({ lang, t, tb }: { lang: Locale; t: Messages["header"]; tb: Messages["basket"] }) {
   const count = useBasket((state) => itemCount(state.lines));
   const [open, setOpen] = useState(false);
+  /** The pass handed over at checkout, while it is on the table. */
+  const [pass, setPass] = useState<PassOrder | null>(null);
   const [said, setSaid] = useState("");
   const barrow = useRef<HTMLSpanElement>(null);
 
@@ -79,7 +83,7 @@ export function BasketButton({ lang, t, tb }: { lang: Locale; t: Messages["heade
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        aria-expanded={open}
+        aria-expanded={open || !!pass}
         aria-label={format(t.basket, { count })}
         className="basket-button flex items-center gap-1.5"
       >
@@ -91,7 +95,18 @@ export function BasketButton({ lang, t, tb }: { lang: Locale; t: Messages["heade
       <span role="status" className="sr-only">
         {said}
       </span>
-      {open && <BasketDialog lang={lang} t={tb} onClose={() => setOpen(false)} />}
+      {open && (
+        <BasketDialog
+          lang={lang}
+          t={tb}
+          onClose={() => setOpen(false)}
+          onPass={(order) => {
+            setOpen(false);
+            setPass(order);
+          }}
+        />
+      )}
+      {pass && <FarmPass lang={lang} t={tb} order={pass} onClose={() => setPass(null)} />}
     </>
   );
 }

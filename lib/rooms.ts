@@ -40,6 +40,12 @@ export const roomSchema = z.strictObject({
    */
   grade: z.tuple([gain, gain, gain]).optional(),
   /**
+   * Gains for the leaves' white paint (the trim and crosses), taken over from
+   * `grade` wherever a pixel has little colour of its own, so the whites come
+   * out warm white while the painted boards keep their own grade.
+   */
+  trim: z.tuple([gain, gain, gain]).optional(),
+  /**
    * Gains on the leaves' red, green and blue at the cut, where the leaves are
    * still seen in the square's light; they ease back to 1 as the room settles.
    */

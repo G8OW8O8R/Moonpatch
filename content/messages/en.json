@@ -89,9 +89,16 @@
     "kept": "{name} is kept for your visit.",
     "doneTitle": "All set",
     "shipped": "Your shipped items would be on their way.",
-    "visitOn": "See you on {day} · {hours}",
     "hours": "10 am – 8 pm",
     "charged": "This is a demo shop, nothing was charged.",
-    "back": "Back to the farm"
+    "back": "Back to the farm",
+    "passTitle": "Farm Pass",
+    "passWaiting": "Waiting for you at the café:",
+    "passAdmit": "Admit one",
+    "passStamp": "Moon stamp",
+    "passNote": "Show this at the gate. This is a demo shop, nothing was charged.",
+    "passSave": "Save ticket",
+    "passSaved": "Ticket saved. Your wheelbarrow is empty again.",
+    "passFile": "moonpatch-farm-pass"
   }
 }

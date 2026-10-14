@@ -144,13 +144,15 @@ export function ProductCard({ product, lang, t, from, seed, onClose }: ProductCa
                 <h2 id={titleId} className="card-title font-display">
                   {name}
                 </h2>
-                <p className="card-description">{product.description[lang]}</p>
-                {product.ingredients && (
-                  <div className="card-ingredients">
-                    <h3>{t.ingredients}</h3>
-                    <p>{product.ingredients[lang]}</p>
-                  </div>
-                )}
+                <div className="card-scroll" data-lenis-prevent>
+                  <p className="card-description">{product.description[lang]}</p>
+                  {product.ingredients && (
+                    <div className="card-ingredients">
+                      <h3>{t.ingredients}</h3>
+                      <p>{product.ingredients[lang]}</p>
+                    </div>
+                  )}
+                </div>
                 {foot}
               </div>
             </div>
@@ -166,7 +168,9 @@ export function ProductCard({ product, lang, t, from, seed, onClose }: ProductCa
                   <h2 id={titleId} className="card-title font-display">
                     {name}
                   </h2>
-                  <p className="card-description">{product.description[lang]}</p>
+                  <div className="card-scroll" data-lenis-prevent>
+                    <p className="card-description">{product.description[lang]}</p>
+                  </div>
                   {foot}
                 </div>
               </div>

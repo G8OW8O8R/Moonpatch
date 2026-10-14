@@ -9,7 +9,8 @@
  * shares of the plate), so its mask is exact: everything between the edge and
  * the side of the plate, with a two-pixel ramp across the edge itself. A room
  * may grade its leaves (`grade`, gains on red, green, blue) so the doors keep
- * the white they have outside; the grade follows the mask, ramp included.
+ * the colour they have outside, with their white paint graded on its own
+ * (`trim`); the grade follows the mask, ramp included.
  *
  *   <room>-<layer>-<width>   the leaf as WebP with alpha, cropped to its side.
  *   plates/<room>-<width>    the room's own picture, written here instead of by
@@ -55,6 +56,7 @@ interface RoomFile {
   look: number;
   layers: Layer[];
   grade?: [number, number, number];
+  trim?: [number, number, number];
 }
 
 const readRoom = async (room: Room): Promise<RoomFile> =>
@@ -84,8 +86,16 @@ const sampleRow = (rgb: Buffer, y: number, x: number, c: number) => {
   return rgb[(y * W + x0) * 3 + c]! * (1 - t) + rgb[(y * W + x1) * 3 + c]! * t;
 };
 
-/** The plate with each leaf's white balance applied, weighted by the leaf's mask. */
-function graded(rgb: Buffer, layers: Layer[], gains: [number, number, number]): Buffer {
+/** How white a pixel is painted: 0 for a coloured board, 1 where its channels are near equal. */
+const whiteness = (r: number, g: number, b: number) => {
+  const t = Math.min(1, Math.max(0, (Math.min(r, g, b) / Math.max(1, r, g, b) - 0.55) / 0.17));
+  return t * t * (3 - 2 * t);
+};
+
+type Gains = [number, number, number];
+
+/** The plate with each leaf's white balance applied, weighted by the leaf's mask; white paint takes `trim`. */
+function graded(rgb: Buffer, layers: Layer[], gains: Gains, trim: Gains = gains): Buffer {
   const out = Buffer.from(rgb);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
@@ -93,9 +103,11 @@ function graded(rgb: Buffer, layers: Layer[], gains: [number, number, number]): 
       for (const layer of layers) a = Math.max(a, alphaAt(into(layer, x, y)));
       if (a <= 0) continue;
       const o = (y * W + x) * 3;
+      const w = whiteness(rgb[o]!, rgb[o + 1]!, rgb[o + 2]!);
       for (let c = 0; c < 3; c++) {
         const v = rgb[o + c]!;
-        out[o + c] = Math.min(255, Math.max(0, Math.round(v + (v * gains[c]! - v) * a)));
+        const gain = gains[c]! + (trim[c]! - gains[c]!) * w;
+        out[o + c] = Math.min(255, Math.max(0, Math.round(v + (v * gain - v) * a)));
       }
     }
   return out;
@@ -247,10 +259,10 @@ async function writeDebug(room: Room, rgb: Buffer, clean: Buffer, cuts: Cut[], l
 async function main() {
   await mkdir(outDir, { recursive: true });
   for (const room of ROOMS) {
-    const { layers, grade } = await readRoom(room);
+    const { layers, grade, trim } = await readRoom(room);
     const { data: source, info } = await sharp(join(root, "public", "plates", `${room}.jpg`)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     if (info.width !== W || info.height !== H) throw new Error(`${room}.jpg must be ${W}×${H}`);
-    const rgb = grade ? graded(source, layers, grade) : source;
+    const rgb = grade ? graded(source, layers, grade, trim) : source;
     const { clean, cuts } = lift(rgb, layers);
     await writeDebug(room, rgb, clean, cuts, layers);
     if (debugDir && process.argv.includes("--preview")) continue;

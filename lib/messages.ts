@@ -82,10 +82,17 @@ export const messagesSchema = z.strictObject({
     kept: text.includes("{name}"),
     doneTitle: text,
     shipped: text,
-    visitOn: text.includes("{day}").includes("{hours}"),
     hours: text,
     charged: text,
     back: text,
+    passTitle: text,
+    passWaiting: text,
+    passAdmit: text,
+    passStamp: text,
+    passNote: text,
+    passSave: text,
+    passSaved: text,
+    passFile: text.regex(/^[a-z0-9-]+$/),
   }),
 });
 

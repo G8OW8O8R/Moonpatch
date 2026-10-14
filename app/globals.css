@@ -978,14 +978,16 @@
     align-items: center;
   }
 
-  /* The 40 % is the line's own ink; its hug stays whole (as the letters' does), or the rule melts into bright plaster. */
+  /* The 40 % is the line's own ink. A border, not a filled box: the browser snaps it to a whole device
+     pixel, where a 1px box on a half pixel smears into two faint rows and vanishes on bright plaster.
+     A soft shadow under it (as under the letters) keeps it on a pale wall. */
   .corridor-rule {
     flex: none;
     width: 28px;
-    height: 1px;
+    height: 0;
     margin-inline: 0.75rem;
-    background-color: color-mix(in srgb, currentColor 40%, transparent);
-    box-shadow: 0 0 1px var(--header-halo), 0 0 2px color-mix(in srgb, var(--header-halo) 70%, transparent);
+    border-top: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+    filter: drop-shadow(0 0 1px var(--header-halo)) drop-shadow(0 1px 1px color-mix(in srgb, var(--header-halo) 60%, transparent));
   }
 
   .corridor-here {
@@ -1110,61 +1112,127 @@
 
 /* Products in the rooms: a seed over each, and the card that opens out of it. */
 @layer components {
-  /* A fingertip-sized button around each seed of light the scene draws. */
+  /* A fingertip-sized button around each product's seed: a paper dot in a thin breathing ring. */
   .seed {
+    --ring: 26px;
     position: absolute;
     width: 44px;
     height: 44px;
     margin: -22px 0 0 -22px;
     border-radius: var(--radius-pill);
+    color: var(--color-paper);
     cursor: pointer;
-    text-shadow: none;
   }
 
   .seed:focus-visible {
-    outline-offset: -8px;
+    outline-offset: -6px;
   }
 
-  /* Without the scene, the page marks the seed itself: a plain amber dot, no light. */
-  .seed-dot {
+  /* Dot and ring, with the same dark hug the header's marks have, so they hold on a bright wall. */
+  .seed-mark {
+    position: absolute;
+    inset: 0;
+    filter: drop-shadow(0 0 0.5px var(--header-halo)) drop-shadow(0 0 1.5px color-mix(in srgb, var(--header-halo) 80%, transparent))
+      drop-shadow(0 1px 3px color-mix(in srgb, var(--header-halo) 35%, transparent));
+  }
+
+  .seed-dot,
+  .seed-ring {
     position: absolute;
     left: 50%;
     top: 50%;
-    width: 9px;
-    height: 9px;
-    margin: -4.5px 0 0 -4.5px;
     border-radius: var(--radius-pill);
-    background: var(--color-pumpkin-light);
-    box-shadow: 0 0 0 1.5px var(--color-cream);
   }
 
-  .room-seeds[data-lit] .seed-dot {
-    opacity: 0;
+  .seed-dot {
+    width: 8px;
+    height: 8px;
+    margin: -4px 0 0 -4px;
+    background: currentColor;
   }
 
-  /* The product's name, over its seed while it is pointed at or focused. */
+  /* 26 px, breathing out (1 → 1.5, fading) every 2.4 s; each seed a little out of step with the next. */
+  .seed-ring {
+    width: var(--ring);
+    height: var(--ring);
+    margin: calc(var(--ring) / -2) 0 0 calc(var(--ring) / -2);
+    border: 1px solid currentColor;
+    opacity: 0.7;
+    animation: seed-breathe 2.4s var(--ease-out) infinite;
+    animation-delay: calc(var(--i) * -0.83s);
+    transition:
+      transform var(--duration-ui) var(--ease-out),
+      opacity var(--duration-ui) var(--ease-out);
+  }
+
+  /* Pointed at, focused or open: the ring opens to 34 px and holds still. */
+  .seed:is(:hover, :focus-visible, [data-open]) .seed-ring {
+    animation: none;
+    opacity: 0.7;
+    transform: scale(calc(34 / 26));
+  }
+
+  @keyframes seed-breathe {
+    from {
+      opacity: 0.7;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(1.5);
+    }
+  }
+
+  /* Landed in the room: the seeds come up one after another, just past full size and back. */
+  .room-ui[data-arrived] .seed-mark {
+    animation: seed-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: calc(300ms + var(--i) * 70ms);
+  }
+
+  @keyframes seed-in {
+    from {
+      transform: scale(0);
+    }
+  }
+
+  /* The product's name beside its seed, in the type alone, sliding 6 px out of its own line. */
   .seed-label {
     position: absolute;
-    left: 50%;
-    bottom: calc(100% - 6px);
-    padding: 2px 10px;
-    border-radius: var(--radius-sm);
-    background: var(--color-cream);
-    color: var(--color-ink);
-    font-size: 15px;
-    line-height: 1.5;
+    left: calc(50% + 22px);
+    top: 50%;
+    padding: 0.15em 0.3em 0.25em;
+    margin-top: -0.85em;
+    font-size: clamp(16px, 1.1vw, 18px);
+    font-style: italic;
+    line-height: 1.2;
+    font-variation-settings: "opsz" 24, "SOFT" 50, "WONK" 0;
     white-space: nowrap;
-    opacity: 0;
-    transform: translate3d(-50%, 4px, 0);
-    transition:
-      opacity var(--duration-tap) var(--ease-out),
-      transform var(--duration-tap) var(--ease-out);
+    text-shadow: var(--hug-room);
+    clip-path: inset(-0.3em 0 -0.3em 0);
     pointer-events: none;
   }
 
-  .seed:is(:hover, :focus-visible):not([data-open]) .seed-label {
+  .seed[data-side="left"] .seed-label {
+    left: auto;
+    right: calc(50% + 22px);
+  }
+
+  .seed-label-line {
+    display: inline-block;
+    opacity: 0;
+    transform: translate3d(-6px, 0, 0);
+    transition:
+      opacity var(--duration-tap) var(--ease-out),
+      transform var(--duration-ui) var(--ease-out);
+  }
+
+  .seed[data-side="left"] .seed-label-line {
+    transform: translate3d(6px, 0, 0);
+  }
+
+  .seed:is(:hover, :focus-visible):not([data-open]) .seed-label-line {
     opacity: 1;
-    transform: translate3d(-50%, 0, 0);
+    transform: none;
   }
 
   .card-layer {
@@ -1186,13 +1254,36 @@
     will-change: transform, opacity;
   }
 
+  /* The whole 4:5 photo, never cropped: on a short window it gets shorter and narrower together. */
+  .card-photo {
+    flex: none;
+  }
+
   .card-photo img {
     display: block;
-    width: 100%;
+    width: auto;
+    max-width: 100%;
     height: auto;
+    max-height: var(--photo-max);
     aspect-ratio: 4 / 5;
+    margin-inline: auto;
     border-radius: var(--radius-xs);
     user-select: none;
+  }
+
+  /* The card fits the window: photo and title on top, price and action held at the foot,
+     only the words between them scroll (kept from the page's own smooth scroll). */
+  .card-title {
+    flex: none;
+  }
+
+  .card-scroll {
+    flex: 1 1 auto;
+    min-height: 3rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--color-ink) 30%, transparent) transparent;
   }
 
   .card-title {
@@ -1231,6 +1322,7 @@
   }
 
   .card-foot {
+    flex: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1281,11 +1373,11 @@
   }
 
   .recipe-paper {
+    --photo-max: 38lvh;
     position: relative;
+    display: flex;
+    flex-direction: column;
     max-height: calc(100lvh - var(--top) - var(--spacing-gutter));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
     padding: 3.25rem 1.75rem 1.75rem;
     background: var(--color-cream) url(/textures/paper-cream.jpg) 0 0 / 480px auto;
   }
@@ -1341,7 +1433,11 @@
   }
 
   .tag-paper {
+    --photo-max: 34lvh;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100lvh - var(--twine) - var(--spacing-gutter));
     padding: 5rem 1.5rem 1.5rem;
     background: #c9a77a url(/textures/paper-kraft.jpg) 0 0 / 420px auto;
     clip-path: polygon(24% 0, 76% 0, 100% 56px, 100% 100%, 0 100%, 0 56px);
@@ -1447,6 +1543,7 @@
     }
 
     .recipe-paper {
+      --photo-max: 30svh;
       max-height: 86svh;
       padding: 3rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
     }
@@ -1455,6 +1552,11 @@
       display: block;
       width: min(56%, 240px);
       margin-inline: auto;
+    }
+
+    .tag-paper {
+      --photo-max: 28svh;
+      max-height: calc(100svh - var(--twine) - var(--spacing-gutter));
     }
 
     .card-tag {
@@ -1468,8 +1570,14 @@
       animation: none;
     }
 
-    .seed-label {
-      transform: translate3d(-50%, 0, 0);
+    .seed-ring,
+    .room-ui[data-arrived] .seed-mark {
+      animation: none;
+    }
+
+    .seed-label-line,
+    .seed[data-side="left"] .seed-label-line {
+      transform: none;
     }
   }
 }
@@ -1920,6 +2028,242 @@
 
     .basket-foot .card-action {
       width: 100%;
+    }
+  }
+}
+
+/* The Farm Pass: a cream ticket laid on the dimmed scene, the words and two links under it. */
+@layer components {
+  .pass-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+  }
+
+  .pass-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgb(43 33 28 / 0.55);
+    animation: fade-in var(--duration-panel) var(--ease-out) both;
+  }
+
+  .pass {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2rem;
+    padding: 96px 16px calc(24px + env(safe-area-inset-bottom));
+    outline: none;
+    pointer-events: none;
+  }
+
+  .pass > * {
+    pointer-events: auto;
+  }
+
+  .pass-fit {
+    flex: none;
+    position: relative;
+  }
+
+  .pass-motion {
+    will-change: transform, opacity;
+    filter: drop-shadow(0 2px 3px rgb(43 33 28 / 0.4)) drop-shadow(0 22px 30px rgb(20 14 10 / 0.45));
+  }
+
+  /* Laid out in its own px (as the saved picture is), scaled to the window. */
+  .pass-ticket {
+    position: relative;
+    transform-origin: 0 0;
+    color: var(--color-ink);
+    --pass-pumpkin: color-mix(in srgb, var(--color-pumpkin) 82%, var(--color-ink));
+  }
+
+  .pass-piece {
+    position: absolute;
+    background:
+      radial-gradient(ellipse closest-corner at 50% 50%, rgb(140 100 50 / 0) 55%, rgb(140 100 50 / 0.2) 100%) 0 0 / 100% 100%,
+      var(--color-cream) url(/textures/paper-cream.jpg) 0 0 / 520px auto;
+  }
+
+  /* Its paper carries on from the main piece's (the position is set from the layout). */
+  .pass-stub {
+    transform-origin: 0 0;
+  }
+
+  .pass-frames {
+    position: absolute;
+    inset: 0;
+    overflow: visible;
+    fill: none;
+    stroke: currentColor;
+  }
+
+  .pass-arc {
+    fill: var(--pass-pumpkin);
+    stroke: none;
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    font-variation-settings: "opsz" 36, "SOFT" 100, "WONK" 0;
+  }
+
+  .pass-ticket[data-orientation="tall"] .pass-arc {
+    font-size: 24px;
+  }
+
+  .pass-wordmark {
+    position: absolute;
+    user-select: none;
+  }
+
+  /* Each line a band across the piece, its words an inline run centred in it. */
+  .pass-line,
+  .pass-waiting,
+  .pass-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    text-align: center;
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+
+  .pass-date {
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    font-variation-settings: "opsz" 48, "SOFT" 50, "WONK" 0;
+  }
+
+  .pass-ticket[data-orientation="tall"] .pass-date {
+    font-size: 28px;
+  }
+
+  .pass-waiting {
+    font-size: 23px;
+    font-variation-settings: "opsz" 36, "SOFT" 50, "WONK" 0;
+  }
+
+  .pass-ticket[data-orientation="tall"] .pass-waiting {
+    font-size: 22px;
+  }
+
+  .pass-list {
+    width: fit-content;
+    margin-inline: auto;
+    text-align: left;
+    font-size: 26px;
+    font-variation-settings: "opsz" 36, "SOFT" 50, "WONK" 0;
+  }
+
+  .pass-ticket[data-orientation="tall"] .pass-list {
+    font-size: 24px;
+  }
+
+  .pass-qty {
+    color: var(--pass-pumpkin);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The ticket's number: tiny interface type, spaced capitals, ink at 70 % (as a colour, so the saved picture keeps it). */
+  .pass-serial {
+    position: absolute;
+    color: color-mix(in srgb, currentColor 70%, transparent);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: 0.16em;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pass-admit {
+    position: absolute;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+    font-variation-settings: "opsz" 48, "SOFT" 30, "WONK" 0;
+  }
+
+  /* Ink pressed into the paper, not quite solid. */
+  .pass-stamp {
+    position: absolute;
+    height: auto;
+    opacity: 0.9;
+    mix-blend-mode: multiply;
+    user-select: none;
+  }
+
+  .pass-foot {
+    display: grid;
+    justify-items: center;
+    gap: 0.75rem;
+    max-width: 40rem;
+    color: var(--color-paper);
+    font-size: var(--text-ui);
+    line-height: 1.5;
+    text-align: center;
+    text-shadow: 0 1px 2px rgb(20 14 10 / 0.6);
+    animation: fade-in var(--duration-panel) var(--ease-out) 450ms both;
+  }
+
+  .pass-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem 2rem;
+  }
+
+  .pass-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 44px;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.25em;
+    cursor: pointer;
+  }
+
+  .pass-link[aria-busy="true"] {
+    cursor: progress;
+    opacity: 0.7;
+  }
+
+  .pass-link-arrow .mask-icon {
+    width: 1.1em;
+    height: 1.1em;
+  }
+
+  .pass-link-down {
+    transform: rotate(-90deg);
+  }
+
+  .pass-link-on {
+    transform: rotate(180deg);
+  }
+
+  @media (max-width: 699px) {
+    .pass {
+      gap: 1.25rem;
+      padding-top: 80px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pass-scrim,
+    .pass-foot {
+      animation-duration: 150ms;
+      animation-delay: 0ms;
     }
   }
 }

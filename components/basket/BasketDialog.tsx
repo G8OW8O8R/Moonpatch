@@ -7,6 +7,7 @@ import { subscribeLenis } from "@/components/ui/lenis-channel";
 import { useFocusTrap } from "@/components/ui/useFocusTrap";
 import { type PricedLine, formatDay, formatMoney, sections, visitDays } from "@/lib/basket";
 import { useBasket } from "@/lib/basket-store";
+import { type PassOrder, passOrder } from "@/lib/farm-pass";
 import type { Locale } from "@/lib/i18n";
 import { type Messages, format } from "@/lib/messages";
 import { cubicBezier, duration, ease } from "@/lib/motion-tokens";
@@ -65,8 +66,11 @@ function Line({ line, lang, t, ruled }: { line: PricedLine; lang: Locale; t: Mes
  * right (on a phone, a sheet up from the bottom). What is shipped home and
  * what waits at the farm are listed apart; the latter asks for the day of the
  * visit. A demo shop: “Checkout” only says what would happen, nothing is paid.
+ * With something waiting at the farm it hands over the Farm Pass (`onPass`);
+ * with everything shipped, a short note on the same sheet, and the
+ * wheelbarrow is empty again.
  */
-export function BasketDialog({ lang, t, onClose }: { lang: Locale; t: Messages["basket"]; onClose(): void }) {
+export function BasketDialog({ lang, t, onClose, onPass }: { lang: Locale; t: Messages["basket"]; onClose(): void; onPass(order: PassOrder): void }) {
   const dialog = useRef<HTMLDivElement>(null);
   const motion = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -143,7 +147,10 @@ export function BasketDialog({ lang, t, onClose }: { lang: Locale; t: Messages["
       daysRef.current?.querySelector<HTMLInputElement>("input")?.focus();
       return;
     }
+    const order = passOrder(lines, visitDay);
+    if (order) return onPass(order);
     setDone(true);
+    useBasket.getState().clear();
     requestAnimationFrame(() => closeButton.current?.focus());
   };
 
@@ -215,8 +222,7 @@ export function BasketDialog({ lang, t, onClose }: { lang: Locale; t: Messages["
 
               {done ? (
                 <div className="basket-done" role="status">
-                  {visitDay && split.visit.lines.length > 0 && <p className="basket-done-day font-display">{format(t.visitOn, { day: formatDay(visitDay, lang, "long"), hours: t.hours })}</p>}
-                  {split.ship.lines.length > 0 && <p>{t.shipped}</p>}
+                  <p className="basket-done-day font-display">{t.shipped}</p>
                   <p>{t.charged}</p>
                   <button type="button" className="basket-link" onClick={close}>
                     {t.back}

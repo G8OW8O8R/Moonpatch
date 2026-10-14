@@ -30,8 +30,6 @@ export interface GateController {
   setDoor(params: DoorParams): void;
   setPointer(at: { x: number; y: number } | null): void;
   setLook(look: number): void;
-  /** The seed pointed at or focused inside the room (an index into its hotspots), or none. */
-  setSpot(spot: number | null): void;
   seek(at: DoorSeek | null): void;
   resize(css: Size): void;
   setActive(active: boolean): void;
@@ -94,7 +92,6 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
     setDoor: (params) => send({ type: "door", params }),
     setPointer: (at) => send({ type: "pointer", at }),
     setLook: (look) => send({ type: "look", look }),
-    setSpot: (spot) => send({ type: "spot", spot }),
     seek: (at) => send({ type: "seek", at }),
     resize: (css, dpr) => send({ type: "resize", css, dpr }),
     setActive: (active) => send({ type: "active", active }),
@@ -190,7 +187,6 @@ export function startGate(
     setDoor: (params) => withEngine((e) => e.setDoor(params)),
     setPointer: (at) => engine?.setPointer(at),
     setLook: (look) => engine?.setLook(look),
-    setSpot: (spot) => engine?.setSpot(spot),
     seek: (at) => withEngine((e) => e.seek(at)),
     resize(next) {
       css = next;

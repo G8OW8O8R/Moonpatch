@@ -115,8 +115,6 @@ export interface Engine {
   setPointer(at: { x: number; y: number } | null): void;
   /** Where a narrow screen looks inside the room (a share of the plate's width). */
   setLook(look: number): void;
-  /** The seed pointed at or focused (an index into the room's hotspots), or none. */
-  setSpot(spot: number | null): void;
   seek(at: DoorSeek | null): void;
   resize(css: Size, dpr: number): void;
   setActive(active: boolean): void;
@@ -135,7 +133,6 @@ export type ToWorker =
   | { type: "door"; params: DoorParams }
   | { type: "pointer"; at: { x: number; y: number } | null }
   | { type: "look"; look: number }
-  | { type: "spot"; spot: number | null }
   | { type: "seek"; at: DoorSeek | null }
   | { type: "resize"; css: Size; dpr: number }
   | { type: "active"; active: boolean }
@@ -229,11 +226,6 @@ async function loadRoomImages(room: RoomId, css: Size, dpr: number, format: stri
 }
 
 /** How the room follows a mouse: critically damped, so it never drifts past where it points. */
-/** Seeds light up over the last stretch of the landing; one pointed at brightens this much, this fast (s). */
-const SEEDS_FROM = 0.86;
-const SEED_POINTED = 0.7;
-const SEED_EASE = 0.18;
-
 const POINTER_SPRING = { stiffness: 28, damping: 2 * Math.sqrt(28), mass: 1 } as const;
 
 /** The format the browser chose for the poster, used for every plate after it. */
@@ -330,10 +322,6 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
   let seekShown: DoorSeek | null = null;
   const loadingPlates = new Set<RoomId>();
   let pointer = { x: 0, y: 0 };
-  /** The seed pointed at, and how far each seed has brightened towards it (0–1). */
-  let spot: number | null = null;
-  let seedBoost: number[] = [];
-  let seedRoom: RoomId | null = null;
   let drift: { x: SpringState; y: SpringState } = { x: { value: 0, velocity: 0 }, y: { value: 0, velocity: 0 } };
 
   const gl = canvas.getContext("webgl2", {
@@ -432,12 +420,7 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     // Inside, a mouse moves the room a little.
     const aim = journeying && inRoom(j) ? pointer : { x: 0, y: 0 };
     drift = { x: stepSpring(drift.x, aim.x, dt, POINTER_SPRING), y: stepSpring(drift.y, aim.y, dt, POINTER_SPRING) };
-    if (seedRoom !== shownRoom) {
-      seedRoom = shownRoom;
-      seedBoost = [];
-    }
-    const seedsEasing = stepSeeds(dt);
-    const drifting = pointerMoved || lookMoved || seedsEasing || !isSettled(drift.x, aim.x) || !isSettled(drift.y, aim.y);
+    const drifting = pointerMoved || lookMoved || !isSettled(drift.x, aim.x) || !isSettled(drift.y, aim.y);
     pointerMoved = false;
     lookMoved = false;
 
@@ -510,27 +493,6 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     if (!raf && active && !disposed) raf = frames.request(frame);
   };
 
-  /** Eases each seed towards being pointed at or not; true while any is still on its way. */
-  function stepSeeds(dt: number): boolean {
-    const n = Math.max(seedBoost.length, spot === null ? 0 : spot + 1);
-    let easing = false;
-    for (let i = 0; i < n; i++) {
-      const target = i === spot ? 1 : 0;
-      const value = seedBoost[i] ?? 0;
-      const next = value + Math.sign(target - value) * Math.min(Math.abs(target - value), dt / SEED_EASE);
-      seedBoost[i] = next;
-      if (next !== target) easing = true;
-    }
-    return easing;
-  }
-
-  /** The seeds' light in a room at this point of the journey: they come up as the camera lands. */
-  function seedGains(j: number): number[] {
-    const lit = smoothstep(SEEDS_FROM, 1, j);
-    if (lit <= 0) return [];
-    return Array.from({ length: Math.max(8, seedBoost.length) }, (_, i) => lit * (1 + SEED_POINTED * (seedBoost[i] ?? 0)));
-  }
-
   /** One frame of the journey: the square pushed in on the door, or the room, blurred as fast as it moves. */
   function drawJourney(room: RoomId, j: number, head: Head | null, leg: Leg, now: number) {
     const params = seekAt ? door : moveParams;
@@ -577,7 +539,7 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
       const { room, j } = shot;
       roomRenderer!.render(
         room,
-        { j, drift: { x: drift.x.value, y: drift.y.value }, look: shot.look, lookStart: shot.lookStart, balance: leafBalanceAt(j), seeds: seedGains(j), params, into },
+        { j, drift: { x: drift.x.value, y: drift.y.value }, look: shot.look, lookStart: shot.lookStart, balance: leafBalanceAt(j), params, into },
         css,
         ratio,
         size,
@@ -853,11 +815,6 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
       look = next;
       lookMoved = true;
       schedule();
-    },
-    setSpot(next) {
-      if (next === spot) return;
-      spot = next;
-      if (journeyRoom && journeyJ >= 1) schedule();
     },
     seek(at) {
       seekAt = at;
