@@ -39,6 +39,12 @@
     "map": "Hand-drawn map: Hollow Road winds from the gate past the orchard to the farm.",
     "drawings": "Pencil sketches of three pumpkins and maple leaves."
   },
+  "notFound": {
+    "title": "This path leads nowhere.",
+    "line": "Just a scarecrow, a lot of pumpkins and the fog rolling in. The farm is back the way you came.",
+    "back": "Back to the gate",
+    "alt": "A pumpkin field at dusk under a thin moon, fog rolling in, a scarecrow keeping watch over an empty dirt track."
+  },
   "rooms": {
     "back": "Back to the square",
     "plaque": "Moonpatch Farm · No. {n}",

@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 
 const PAPER = "rgb(245, 240, 232)";
 
-test("dusk on the square: the signpost leads to the buildings, the notice board opens and closes from the keyboard", async ({ page }) => {
+test("dusk on the square: the signpost leads to the buildings, the notice board opens and closes from the keyboard", async ({ page, browserName }) => {
+  // WebKit here never steps onto links with the Tab key (a browser setting); it is given the focus instead.
+  const tabsToLinks = browserName !== "webkit";
   await page.setViewportSize({ width: 1536, height: 864 });
   // The square's own address: the scene starts where it ends, at dusk.
   await page.goto("/en#square");
@@ -27,11 +29,18 @@ test("dusk on the square: the signpost leads to the buildings, the notice board 
 
   // From the keyboard: the signpost first, then the notice board (once the props stand on the square).
   await expect(page.locator(".square-props")).not.toHaveAttribute("inert");
-  await page.getByRole("link", { name: "PL – Polski" }).focus();
-  await page.keyboard.press("Tab");
-  await expect(signpost.getByRole("link", { name: "Café" })).toBeFocused();
-  for (let i = 0; i < 3; i++) await page.keyboard.press("Tab");
   const board = page.getByRole("button", { name: /Notice board/ });
+  if (tabsToLinks) {
+    await page.getByRole("link", { name: "PL – Polski" }).focus();
+    await page.keyboard.press("Tab");
+    await expect(page.getByRole("button", { name: /in your wheelbarrow/ })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(signpost.getByRole("link", { name: "Café" })).toBeFocused();
+    for (let i = 0; i < 3; i++) await page.keyboard.press("Tab");
+  } else {
+    await page.getByRole("button", { name: /in your wheelbarrow/ }).focus();
+    await page.keyboard.press("Tab");
+  }
   await expect(board).toBeFocused();
 
   // The board opens on its own address, as a dialog that holds the focus.

@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   images: { unoptimized: true },
+  // A wrong turn outside both languages still lands in the farm's own 404.
+  experimental: { globalNotFound: true },
   async headers() {
     return [
       {

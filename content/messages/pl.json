@@ -39,6 +39,12 @@
     "map": "Odręczna mapka: Hollow Road wije się od bramy obok sadu aż do farmy.",
     "drawings": "Szkice ołówkiem: trzy dynie i liście klonu."
   },
+  "notFound": {
+    "title": "Ta ścieżka prowadzi donikąd.",
+    "line": "Tylko strach na wróble, mnóstwo dyń i nadciągająca mgła. Farma została za tobą.",
+    "back": "Wróć do bramy",
+    "alt": "Pole dyń o zmierzchu pod cienkim sierpem księżyca, nadciąga mgła, strach na wróble pilnuje pustej polnej drogi."
+  },
   "rooms": {
     "back": "Wróć na plac",
     "plaque": "Moonpatch Farm · Nr {n}",

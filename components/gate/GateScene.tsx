@@ -25,6 +25,7 @@ import { SquareOverlay, type SquareOverlayHandle } from "@/components/square/Squ
 import { VisitBackdrop, placeBackdrop } from "@/components/square/VisitBackdrop";
 import { VisitPanel, openedBoardPicture } from "@/components/square/VisitPanel";
 import { warmSquare } from "@/components/square/warm";
+import { markGateReady } from "./gate-ready";
 import type { DoorSeek, ScenePlace } from "./renderer/engine";
 import type { FrameStats } from "./renderer/GateRenderer";
 import { type SquareState, restingSquare } from "./renderer/SquareRenderer";
@@ -699,6 +700,19 @@ export function GateScene({
     queueMicrotask(() => goTo(place));
   }, [room, boardOpen, goTo]);
 
+  // The browser's back and forward are also taken straight from the address: pressed before the
+  // router has taken in an address just pushed, the route reads as unchanged and would not move.
+  useEffect(() => {
+    const onPop = () =>
+      queueMicrotask(() => {
+        const at = placeAt(window.location.pathname)?.place;
+        if (at === "visit") return;
+        goTo(isRoomId(at) && ROOMS_IN_SCENE.has(at) ? at : "square");
+      });
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [goTo]);
+
   /** The camera has cut across: only the header follows it now, the rest once it has landed. */
   const cutTo = useCallback((place: ScenePlace) => {
     const next = place === "square" ? null : place;
@@ -901,6 +915,7 @@ export function GateScene({
   useEffect(() => {
     const fallBack = (why: string) =>
       queueMicrotask(() => {
+        markGateReady();
         setMode("fallback");
         setReason(why);
       });
@@ -965,10 +980,12 @@ export function GateScene({
           {
             onReady: () => {
               engineReady.current = true;
+              markGateReady();
               showCanvas();
             },
             onFail: (why) => {
               engineReady.current = false;
+              markGateReady();
               controller.current = null;
               setMode("fallback");
               setReason(why);

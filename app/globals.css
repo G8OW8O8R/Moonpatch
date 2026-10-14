@@ -2317,3 +2317,253 @@
     }
   }
 }
+
+/* ------------------------------------------------------------ a wrong turn */
+
+@layer components {
+  /* The field at dusk, cover-fitted; the words in the sky under the wordmark. */
+  .lost {
+    position: relative;
+    min-height: 100svh;
+    overflow: hidden;
+    color: var(--color-paper);
+    background: var(--color-bark);
+  }
+
+  .lost-plate {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 62% 50%;
+  }
+
+  .lost-copy {
+    position: relative;
+    max-width: 36rem;
+    padding: calc(var(--spacing-gutter) + clamp(140px, 16vw, 300px) * 2746.75 / 8789 + clamp(2rem, 7svh, 5rem)) var(--spacing-gutter) 0;
+  }
+
+  .lost-title {
+    font-size: clamp(40px, 5vw, 84px);
+    font-style: italic;
+    line-height: 1.02;
+    font-variation-settings: "opsz" 144, "SOFT" 100, "WONK" 0;
+    text-wrap: balance;
+    text-shadow: var(--hug-room);
+  }
+
+  .lost-line {
+    max-width: 32ch;
+    margin-top: 1rem;
+    font-size: 17px;
+    line-height: 1.5;
+    text-shadow: var(--hug-room);
+  }
+
+  .lost-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+    font-size: var(--text-header);
+    font-weight: 500;
+    line-height: 1.5;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-shadow: var(--hug-room);
+  }
+
+  .lost-back-arrow {
+    filter: drop-shadow(0 0 0.5px var(--header-halo)) drop-shadow(0 0 1px var(--header-halo))
+      drop-shadow(0 0 2px color-mix(in srgb, var(--header-halo) 80%, transparent));
+  }
+
+  .lost-back-arrow .mask-icon {
+    width: 1.1em;
+    height: 1.1em;
+  }
+
+  .lost-back:is(:hover, :focus-visible) .lost-back-arrow {
+    animation: nudge 360ms var(--ease-out);
+  }
+}
+
+/* ------------------------------------------------------------ the opening */
+
+@layer components {
+  /* Warm paper over the gate; on a first visit the pumpkin is drawn and the hairline fills with what
+     has arrived, then the paper lifts (1.95 s at the latest) and the gate comes up out of its warmth.
+     A later visit only lifts the paper. Every exit is a fresh animation, so it starts where it is. */
+  .intro {
+    display: none;
+    position: fixed;
+    inset: 0;
+    /* Over the scene, under the header: the wordmark and the counters are there from the first frame. */
+    z-index: 25;
+    color: var(--color-ink);
+    cursor: default;
+  }
+
+  :root:is([data-intro="first"], [data-intro="repeat"], [data-intro="leaving"], [data-intro="skip"]) .intro {
+    display: block;
+  }
+
+  :root:is([data-intro="leaving"], [data-intro="skip"]) .intro {
+    pointer-events: none;
+  }
+
+  .intro-warm,
+  .intro-light,
+  .intro-center {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* The gate's own light, a little stronger, laid over it and left to fade last. */
+  .intro-warm {
+    background: var(--color-pumpkin-light);
+    mix-blend-mode: soft-light;
+    opacity: 0.7;
+  }
+
+  .intro-light {
+    background: var(--color-cream);
+  }
+
+  .intro-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+  }
+
+  .intro-mark {
+    width: clamp(72px, 7vw, 104px);
+    height: auto;
+    overflow: visible;
+  }
+
+  .intro-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+  }
+
+  .intro-moon {
+    opacity: 0;
+  }
+
+  .intro-track {
+    position: relative;
+    width: 120px;
+    height: 1px;
+    background: color-mix(in srgb, var(--color-ink) 18%, transparent);
+    overflow: hidden;
+  }
+
+  .intro-bar {
+    position: absolute;
+    inset: 0;
+    background: var(--color-ink);
+    transform: scaleX(var(--p, 0.04));
+    transform-origin: left;
+    transition: transform 320ms var(--ease-out);
+  }
+
+  /* First visit: drawn lobe by lobe from the middle out, the stem, then the moon. */
+  :root[data-intro="first"] .intro-line {
+    animation: intro-draw 640ms var(--ease-in-out) forwards;
+    animation-delay: calc(120ms + var(--i) * 90ms);
+  }
+
+  :root[data-intro="first"] .intro-moon {
+    animation: intro-in 320ms var(--ease-out) 900ms forwards;
+  }
+
+  :root[data-intro="first"] .intro-center {
+    animation: intro-out 220ms var(--ease-in-out) 1950ms forwards;
+  }
+
+  :root[data-intro="first"] .intro-light {
+    animation: intro-out 420ms var(--ease-in-out) 1990ms forwards;
+  }
+
+  :root[data-intro="first"] .intro-warm {
+    animation: intro-out 460ms var(--ease-out) 2040ms forwards;
+  }
+
+  /* A later visit: the mark already whole, the paper lifting at once (0.55 s in all). */
+  :root:is([data-intro="repeat"], [data-intro="leaving"], [data-intro="skip"]) .intro-line {
+    stroke-dashoffset: 0;
+  }
+
+  :root:is([data-intro="repeat"], [data-intro="leaving"], [data-intro="skip"]) .intro-moon {
+    opacity: 1;
+  }
+
+  :root[data-intro="repeat"] .intro-track {
+    visibility: hidden;
+  }
+
+  :root[data-intro="repeat"] .intro-center {
+    animation: intro-out 200ms var(--ease-in-out) 80ms forwards;
+  }
+
+  :root[data-intro="repeat"] .intro-light {
+    animation: intro-out 380ms var(--ease-in-out) 120ms forwards;
+  }
+
+  :root[data-intro="repeat"] .intro-warm {
+    animation: intro-out 420ms var(--ease-out) 130ms forwards;
+  }
+
+  /* Everything in early: the same lift, from now. */
+  :root[data-intro="leaving"] .intro-center {
+    animation: intro-gone 220ms var(--ease-in-out) forwards;
+  }
+
+  :root[data-intro="leaving"] .intro-light {
+    animation: intro-gone 420ms var(--ease-in-out) 40ms forwards;
+  }
+
+  :root[data-intro="leaving"] .intro-warm {
+    animation: intro-gone 460ms var(--ease-out) 90ms forwards;
+  }
+
+  /* Skipped: gone in a blink. */
+  :root[data-intro="skip"] :is(.intro-center, .intro-light, .intro-warm) {
+    animation: intro-gone 150ms var(--ease-out) forwards;
+  }
+
+  @keyframes intro-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes intro-in {
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes intro-out {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes intro-gone {
+    to {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .intro {
+      display: none !important;
+    }
+  }
+}

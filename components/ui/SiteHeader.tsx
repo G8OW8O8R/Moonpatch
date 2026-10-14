@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BasketButton } from "@/components/basket/BasketButton";
+import { features } from "@/lib/features";
 import type { Locale } from "@/lib/i18n";
 import { format, type Messages } from "@/lib/messages";
 import { Icon } from "./Icon";
@@ -34,23 +35,29 @@ export function SiteHeader({ lang, t, tb }: { lang: Locale; t: Messages["header"
         <LanguageSwitch current={lang} label={t.language} />
 
         {/* On phones the sound switch drops to a quiet second line under the counters. */}
-        <span className="flex items-center gap-x-2.5 max-sm:order-last max-sm:basis-full max-sm:justify-end sm:gap-x-3.5">
-          <Dot className="max-sm:hidden" />
-          <span className="flex items-center gap-1.5">
-            <Icon name="sound-off" className="drop-shadow-hug" />
-            <span aria-hidden="true">{t.sound}</span>
-            <span className="sr-only">{t.soundOff}</span>
+        {features.sound && (
+          <span className="flex items-center gap-x-2.5 max-sm:order-last max-sm:basis-full max-sm:justify-end sm:gap-x-3.5">
+            <Dot className="max-sm:hidden" />
+            <span className="flex items-center gap-1.5">
+              <Icon name="sound-off" className="drop-shadow-hug" />
+              <span aria-hidden="true">{t.sound}</span>
+              <span className="sr-only">{t.soundOff}</span>
+            </span>
           </span>
-        </span>
+        )}
 
-        <Dot />
-        <span className="flex items-center gap-1.5">
-          <Icon name="moon" className="drop-shadow-hug" />
-          <span aria-hidden="true">
-            {moonsFound}/{MOONS_TOTAL}
-          </span>
-          <span className="sr-only">{format(t.moons, { found: moonsFound, total: MOONS_TOTAL })}</span>
-        </span>
+        {features.moons && (
+          <>
+            <Dot />
+            <span className="flex items-center gap-1.5">
+              <Icon name="moon" className="drop-shadow-hug" />
+              <span aria-hidden="true">
+                {moonsFound}/{MOONS_TOTAL}
+              </span>
+              <span className="sr-only">{format(t.moons, { found: moonsFound, total: MOONS_TOTAL })}</span>
+            </span>
+          </>
+        )}
 
         <Dot />
         <BasketButton lang={lang} t={t} tb={tb} />

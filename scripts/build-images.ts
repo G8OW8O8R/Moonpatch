@@ -10,6 +10,10 @@
  * public/img/textures/{twine,grommet,stamp-moon}.webp: a straight run of the
  * twine (the source lies in a curve), a small ring, a stamp twice as large as
  * it is ever printed.
+ * The 404 plate (public/textures/assets/404.jpg) is built the same way, as plates/404.
+ * Pictures for shared links → public/img/og/<plate>.jpg, 1200×630, cut from the
+ * plates (a graded room from its graded picture); the pumpkin mark →
+ * public/img/icons/icon-{180,192,512}.png on the paper colour.
  * A room that grades its door leaves gets its picture from `pnpm rooms` instead.
  * Sources are never modified.
  */
@@ -109,15 +113,62 @@ async function gradedRooms(): Promise<Set<string>> {
   return rooms;
 }
 
+const ogOut = join(root, "public", "img", "og");
+const OG = { width: 1200, height: 630 } as const;
+
+/** Link previews: each plate cut to 1200×630 about its middle, a plain JPEG every network reads. */
+async function buildShareImages(): Promise<number> {
+  await mkdir(ogOut, { recursive: true });
+  let built = 0;
+  for (const name of ["gate", "square-dusk", "cafe", "barn", "haunt"]) {
+    // The rooms' pictures as the farm shows them (graded leaves); the rest straight from the plate.
+    const graded = join(outDir, `${name}-2576.webp`);
+    const source = ["cafe", "barn", "haunt"].includes(name) ? graded : join(sourceDir, `${name}.jpg`);
+    const output = join(ogOut, `${name}.jpg`);
+    if (await isFresh(output, (await stat(source)).mtimeMs)) continue;
+    const info = await sharp(source)
+      .withIccProfile("srgb")
+      .resize({ ...OG, fit: "cover", position: "centre", kernel: "lanczos3" })
+      .jpeg({ quality: 82, mozjpeg: true })
+      .toFile(output);
+    built += 1;
+    console.log(`og/${name}.jpg  ${info.width}×${info.height}  ${kb(info.size)}`);
+  }
+  return built;
+}
+
+const iconOut = join(root, "public", "img", "icons");
+
+/** The pumpkin mark on paper, for home screens and the manifest. */
+async function buildIcons(): Promise<number> {
+  await mkdir(iconOut, { recursive: true });
+  const source = join(root, "public", "brand", "mark.svg");
+  const sourceMtime = (await stat(source)).mtimeMs;
+  let built = 0;
+  for (const size of [180, 192, 512]) {
+    const output = join(iconOut, `icon-${size}.png`);
+    if (await isFresh(output, sourceMtime)) continue;
+    const inner = Math.round(size * 0.78);
+    const mark = await sharp(source, { density: 72 * (inner / 512) * 4 }).resize(inner, inner).png().toBuffer();
+    const info = await sharp({ create: { width: size, height: size, channels: 4, background: "#F5F0E8" } })
+      .composite([{ input: mark, gravity: "centre" }])
+      .png({ compressionLevel: 9 })
+      .toFile(output);
+    built += 1;
+    console.log(`icons/icon-${size}.png  ${info.width}×${info.height}  ${kb(info.size)}`);
+  }
+  return built;
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
   const skip = await gradedRooms();
   const files = (await readdir(sourceDir)).filter((file) => /\.jpe?g$/i.test(file)).sort();
+  const sources = [...files.map((file) => join(sourceDir, file)), join(textureDir, "404.jpg")];
   let built = 0;
 
-  for (const file of files) {
-    const source = join(sourceDir, file);
-    const { name } = parse(file);
+  for (const source of sources) {
+    const { name, base: file } = parse(source);
     if (skip.has(name)) continue;
     const sourceMtime = (await stat(source)).mtimeMs;
     const { width: sourceWidth = 0 } = await sharp(source).metadata();
@@ -140,6 +191,8 @@ async function main() {
   }
 
   built += await buildTextures();
+  built += await buildShareImages();
+  built += await buildIcons();
   console.log(built ? `Built ${built} files.` : "Plates and textures are up to date.");
 }
 

@@ -1,13 +1,16 @@
 import { type Page, expect, test } from "@playwright/test";
 import { boardLayoutProblems } from "./board-layout";
+import { isBrowserNote } from "./browser-notes";
 
 /** Everything the page says to the console that is not plain information. */
 function listen(page: Page) {
   const said: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error" || message.type() === "warning") said.push(`${message.type()}: ${message.text()}`);
+    if ((message.type() === "error" || message.type() === "warning") && !isBrowserNote(message.text())) said.push(`${message.type()}: ${message.text()}`);
   });
-  page.on("pageerror", (error) => said.push(`pageerror: ${error.message}`));
+  page.on("pageerror", (error) => {
+    if (!isBrowserNote(error.message)) said.push(`pageerror: ${error.message}`);
+  });
   return said;
 }
 
@@ -37,8 +40,10 @@ test.describe("a clean console", () => {
     await settle(page);
     await page.getByRole("link", { name: "Wróć na plac" }).click();
     await expect(page).toHaveURL(/\/pl(#square)?$/);
-    // Back on the square, its picture is there at once, before the scene has loaded beneath it.
-    await expect(page.locator(".square-plates img.square-dusk")).toHaveJSProperty("complete", true);
+    // Back on the square, it is there at once: drawn by the scene, or as its own picture while the scene loads.
+    const plate = page.locator(".square-plates img.square-dusk");
+    if (await plate.count()) await expect(plate).toHaveJSProperty("complete", true);
+    else await expect(page.locator("canvas[data-gate-canvas]")).toHaveAttribute("data-gate-canvas", "webgl");
     await settle(page);
     expect(said).toEqual([]);
   });

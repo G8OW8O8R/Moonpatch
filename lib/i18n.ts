@@ -6,6 +6,9 @@ export function isLocale(value: string | null | undefined): value is Locale {
   return locales.some((locale) => locale === value);
 }
 
+/** Request header the proxy sets to the address's language, for pages that cannot read it from the route. */
+export const LANG_HEADER = "x-farm-lang";
+
 /** Native names, read out after the short EN / PL labels. */
 export const localeNames: Record<Locale, string> = { en: "English", pl: "Polski" };
 

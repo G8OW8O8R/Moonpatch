@@ -26,12 +26,18 @@ export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Prom
     title: { default: meta.title, template: `%s · ${meta.siteName}` },
     description: meta.description,
     applicationName: meta.siteName,
-    icons: { icon: [{ url: "/brand/mark.svg", type: "image/svg+xml" }] },
+    icons: {
+      icon: [
+        { url: "/brand/mark.svg", type: "image/svg+xml" },
+        { url: "/img/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+      ],
+      apple: [{ url: "/img/icons/icon-180.png", sizes: "180x180" }],
+    },
     openGraph: {
       type: "website",
       siteName: meta.siteName,
       locale: lang === "pl" ? "pl_PL" : "en_US",
-      images: [{ url: "/img/plates/gate-1600.webp", width: 1600, height: 893 }],
+      images: [{ url: "/img/og/gate.jpg", width: 1200, height: 630, alt: getMessages(lang).gate.posterAlt }],
     },
     twitter: { card: "summary_large_image" },
   };

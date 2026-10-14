@@ -13,6 +13,6 @@ export async function roomMetadata(room: RoomId, params: Promise<{ lang: string 
     title: copy.title,
     description: copy.description,
     alternates: { canonical: placePath(lang, room), languages: placeAlternates(room, locales, defaultLocale) },
-    openGraph: { url: placePath(lang, room), images: [{ url: `/img/plates/${room}-1600.webp`, width: 1600, height: 893 }] },
+    openGraph: { url: placePath(lang, room), images: [{ url: `/img/og/${room}.jpg`, width: 1200, height: 630, alt: copy.alt }] },
   };
 }

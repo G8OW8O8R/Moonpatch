@@ -1,10 +1,15 @@
 import { preload } from "react-dom";
+import { JsonLd } from "@/components/ui/JsonLd";
 import type { Locale } from "@/lib/i18n";
 import { getMessages } from "@/lib/messages";
 import { SOFT_POSTER, openedBoardFile, openedBoardSrcSet } from "@/lib/square-poster";
 import { openedBoardSizes } from "@/lib/square-props";
-import type { RoomId } from "@/lib/rooms";
+import { type RoomId, isRoomId } from "@/lib/rooms";
+import { siteUrl } from "@/lib/site";
+import { buildingData, storeData } from "@/lib/structured-data";
 import { GatePoster } from "./GatePoster";
+import { Intro } from "./Intro";
+import { decideIntro } from "./intro-stage";
 import { GateScene } from "./GateScene";
 import { sceneCopy } from "./scene-copy";
 
@@ -15,7 +20,7 @@ import { sceneCopy } from "./scene-copy";
  * first is in the HTML from the first byte.
  */
 export function FarmFront({ lang, initialView = "gate" }: { lang: Locale; initialView?: "gate" | "visit" | RoomId }) {
-  const { gate, square } = getMessages(lang);
+  const { gate, square, meta } = getMessages(lang);
   // Opened on the board, the board is the first thing seen.
   if (initialView === "visit") {
     preload(openedBoardFile(1160, "avif"), {
@@ -29,8 +34,20 @@ export function FarmFront({ lang, initialView = "gate" }: { lang: Locale; initia
     preload(SOFT_POSTER.src, { as: "image", type: "image/webp", fetchPriority: "high" });
   }
 
+  const structured = isRoomId(initialView)
+    ? buildingData(initialView, lang, siteUrl(), meta.siteName)
+    : storeData(lang, siteUrl(), { name: meta.siteName, description: meta.description });
+
   return (
     <main>
+      <JsonLd data={structured} />
+      {/* The opening plays only at the gate; a building or the board opens on itself. */}
+      {initialView === "gate" && (
+        <>
+          <script dangerouslySetInnerHTML={{ __html: decideIntro }} />
+          <Intro />
+        </>
+      )}
       <GateScene
         labelledBy="gate-heading"
         initialView={initialView}

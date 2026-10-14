@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: PageProps<"/[lang]/visit">): 
       canonical: placePath(lang, "visit"),
       languages: placeAlternates("visit", locales, defaultLocale),
     },
-    openGraph: { url: placePath(lang, "visit"), images: [{ url: "/img/plates/square-dusk-1600.webp", width: 1600, height: 893 }] },
+    openGraph: { url: placePath(lang, "visit"), images: [{ url: "/img/og/square-dusk.jpg", width: 1200, height: 630 }] },
   };
 }
 

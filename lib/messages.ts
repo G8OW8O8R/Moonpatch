@@ -44,6 +44,12 @@ export const messagesSchema = z.strictObject({
     map: text,
     drawings: text,
   }),
+  notFound: z.strictObject({
+    title: text,
+    line: text,
+    back: text,
+    alt: text,
+  }),
   rooms: z.strictObject({
     back: text,
     plaque: text.includes("{n}"),
