@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BasketButton } from "@/components/basket/BasketButton";
+import { SoundSwitch } from "@/components/sound/SoundSwitch";
 import { features } from "@/lib/features";
 import type { Locale } from "@/lib/i18n";
 import { format, type Messages } from "@/lib/messages";
@@ -38,11 +39,7 @@ export function SiteHeader({ lang, t, tb }: { lang: Locale; t: Messages["header"
         {features.sound && (
           <span className="flex items-center gap-x-2.5 max-sm:order-last max-sm:basis-full max-sm:justify-end sm:gap-x-3.5">
             <Dot className="max-sm:hidden" />
-            <span className="flex items-center gap-1.5">
-              <Icon name="sound-off" className="drop-shadow-hug" />
-              <span aria-hidden="true">{t.sound}</span>
-              <span className="sr-only">{t.soundOff}</span>
-            </span>
+            <SoundSwitch label={t.sound} />
           </span>
         )}
 

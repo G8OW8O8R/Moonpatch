@@ -7,5 +7,5 @@ export const features: Readonly<Record<"moons" | "sound", boolean>> = {
   /** The hidden moons and their counter in the header. */
   moons: false,
   /** Sound and its switch in the header. */
-  sound: false,
+  sound: true,
 };

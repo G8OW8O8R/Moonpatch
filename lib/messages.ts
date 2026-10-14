@@ -22,7 +22,6 @@ export const messagesSchema = z.strictObject({
     home: text,
     language: text,
     sound: text,
-    soundOff: text,
     moons: text.includes("{found}").includes("{total}"),
     basket: text.includes("{count}"),
   }),

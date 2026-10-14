@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { playCue } from "@/components/sound/sound-bus";
 import { Icon } from "@/components/ui/Icon";
 import { itemCount } from "@/lib/basket";
 import { BASKET_STORAGE_KEY, rehydrateBasket, useBasket } from "@/lib/basket-store";
@@ -51,7 +52,7 @@ export function BasketButton({ lang, t, tb }: { lang: Locale; t: Messages["heade
       if (!product) return;
       setSaid(format(product.fulfillment === "visit" ? tb.kept : tb.added, { name: product.name[lang] }));
       const target = barrow.current?.getBoundingClientRect();
-      if (!target || reduced()) return;
+      if (!target || reduced()) return playCue("basket-add");
 
       const photo = document.createElement("img");
       photo.src = `${product.image}.webp`;
@@ -69,6 +70,7 @@ export function BasketButton({ lang, t, tb }: { lang: Locale; t: Messages["heade
         () => {
           photo.remove();
           tip();
+          playCue("basket-add");
         },
         () => photo.remove(),
       );

@@ -1639,7 +1639,8 @@
     overflow: hidden;
   }
 
-  .basket-button {
+  .basket-button,
+  .sound-switch {
     cursor: pointer;
     border-radius: var(--radius-xs);
   }

@@ -17,8 +17,10 @@ import { placeAt, placePath } from "@/lib/routes";
 import { type ArmId, propsOnScreen } from "@/lib/square-props";
 import { DUSK, type Track, defaultTrack, trackAt, trackEnd, trackLength } from "@/lib/square-rig";
 import { SPOT_KEY, readSpot, spotToKeep, startAt, writeSpot } from "@/lib/square-spot";
+import { moveCue, sceneAt } from "@/lib/sound";
 import type { VisitCopy } from "@/lib/visit";
 import { publishLenis } from "@/components/ui/lenis-channel";
+import { playCue, setSoundScene } from "@/components/sound/sound-bus";
 import { SquareDriver } from "@/components/square/driver";
 import { drawArmLabels } from "@/components/square/labels";
 import { SquareOverlay, type SquareOverlayHandle } from "@/components/square/SquareOverlay";
@@ -111,6 +113,8 @@ const whenIdle = (task: () => void, after = 0): (() => void) => {
  * first, and the scene (and the square's own pictures) come this long after the page has loaded.
  */
 const BOARD_SCENE_DELAY = 2500;
+/** How far open the gate is when its creak is heard. */
+const GATE_CREAK = 0.02;
 
 /** Development only: ?layer=gate|plate holds one renderer, for frame-by-frame comparison. */
 const debugLayer = (): { debugLayer?: "gate" | "plate" } => {
@@ -295,6 +299,8 @@ export function GateScene({
   const rideAt = useRef<0 | 1>(0);
   const squareReady = useRef(false);
   const holdTimer = useRef(0);
+  /** The gate's opening as last measured (null before the first measure), for the creak as it starts to swing. */
+  const lastGate = useRef<number | null>(null);
   const openedHere = useRef(false);
   const arrivedOnBoard = useRef(initialView === "visit");
   /**
@@ -333,7 +339,10 @@ export function GateScene({
       if (target === rideTarget.current) return;
       rideTarget.current = target;
       controller.current?.setRide(target);
-      if (modeRef.current === "webgl") hold();
+      if (modeRef.current === "webgl") {
+        hold();
+        playCue("whoosh");
+      }
     },
     [hold],
   );
@@ -396,7 +405,12 @@ export function GateScene({
       rideWanted.current = wanted;
       syncProps();
       showCanvas();
+      setSoundScene(sceneAt(placeRef.current, wanted === 1));
     }
+    // The leaves creak as the scroll starts them swinging (never on a jump straight onto the square).
+    const before = lastGate.current;
+    lastGate.current = at.gate;
+    if (before !== null && before < GATE_CREAK && at.gate >= GATE_CREAK && at.gate < paramsRef.current.threshold) playCue("gate-open");
     if (wanted === 1 || driver.current?.atStart !== false) sendRide(wanted);
     setPastHalf(at.gate >= 0.5);
     // The cut is the first frame only: from the first move on, the scene moves as it always does.
@@ -550,6 +564,7 @@ export function GateScene({
       }
       syncProps(jump);
       d.openBoard(true, jump);
+      if (!jump) playCue("whoosh");
       lenis.current?.stop();
     } else {
       d.openBoard(false);
@@ -659,6 +674,9 @@ export function GateScene({
     (place: ScenePlace) => {
       if (place === placeRef.current) return;
       placeRef.current = place;
+      // The sound goes ahead of the camera: the next bed comes up as the move plays.
+      setSoundScene(sceneAt(place, true));
+      playCue(moveCue(place));
       if (cardOpen.current) {
         cardOpen.current = false;
         setCard(null);
@@ -908,8 +926,20 @@ export function GateScene({
     controller.current?.seek(seek);
   }, [seek]);
 
-  const pointArm = useCallback((arm: ArmId, pointed: boolean) => driver.current?.pointArm(arm, pointed), []);
-  const pointBoard = useCallback((pointed: boolean) => driver.current?.pointBoard(pointed), []);
+  const pointArm = useCallback((arm: ArmId, pointed: boolean) => {
+    driver.current?.pointArm(arm, pointed);
+    if (pointed) playCue("hover");
+  }, []);
+  const pointBoard = useCallback((pointed: boolean) => {
+    driver.current?.pointBoard(pointed);
+    if (pointed) playCue("hover");
+  }, []);
+
+  // The scene is heard while it is on the page: where it opened, then wherever the visitor goes.
+  useEffect(() => {
+    setSoundScene(sceneAt(placeRef.current, rideWanted.current === 1));
+    return () => setSoundScene(null);
+  }, []);
 
   // The WebGL scene, started once the poster is on screen and the page is idle.
   useEffect(() => {

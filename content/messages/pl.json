@@ -13,7 +13,6 @@
     "home": "Moonpatch Farm, powrót do bramy",
     "language": "Język",
     "sound": "Dźwięk",
-    "soundOff": "Dźwięk wyłączony",
     "moons": "Znalezione księżyce: {found} z {total}",
     "basket": "W taczce: {count}"
   },

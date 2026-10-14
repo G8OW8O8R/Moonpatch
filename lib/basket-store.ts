@@ -6,8 +6,9 @@
  * during the server render.
  */
 import { create } from "zustand";
-import { type StateStorage, createJSONStorage, persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { type BasketState, addItem, emptyBasket, readBasket, setQty, visitDays } from "./basket";
+import { browserStorage } from "./browser-storage";
 
 export interface BasketStore extends BasketState {
   /** True once the saved wheelbarrow has been read back. */
@@ -19,38 +20,6 @@ export interface BasketStore extends BasketState {
 }
 
 export const BASKET_STORAGE_KEY = "moonpatch-wheelbarrow";
-
-/**
- * The browser's storage, where there is one; a blocked or full storage (a
- * private window, a strict browser) costs the saved wheelbarrow, never a click.
- */
-function browserStorage(): StateStorage {
-  if (typeof localStorage === "undefined" || !localStorage) throw new Error("no storage");
-  const store = localStorage;
-  return {
-    getItem: (name) => {
-      try {
-        return store.getItem(name);
-      } catch {
-        return null;
-      }
-    },
-    setItem: (name, value) => {
-      try {
-        store.setItem(name, value);
-      } catch {
-        // Not saved; the wheelbarrow still works for this visit.
-      }
-    },
-    removeItem: (name) => {
-      try {
-        store.removeItem(name);
-      } catch {
-        // Nothing to undo.
-      }
-    },
-  };
-}
 
 export const useBasket = create<BasketStore>()(
   persist(
