@@ -1,12 +1,12 @@
 {
   "look": 0.62,
   "hotspots": {
-    "01-pumpkin-spice-latte": [0.4, 0.5],
-    "02-cider-donuts": [0.44, 0.5],
-    "03-cinnamon-rolls": [0.48, 0.5],
-    "04-pumpkin-pie": [0.52, 0.5],
-    "05-pumpkin-butter": [0.56, 0.5],
-    "06-coffee-beans": [0.6, 0.5]
+    "01-pumpkin-spice-latte": [0.4478, 0.7141],
+    "02-cider-donuts": [0.5059, 0.7256],
+    "03-cinnamon-rolls": [0.7557, 0.5958],
+    "04-pumpkin-pie": [0.8152, 0.6254],
+    "05-pumpkin-butter": [0.8863, 0.2834],
+    "06-coffee-beans": [0.277, 0.6845]
   },
   "layers": [
     { "id": "door-left", "side": "left", "edge": [[0.09946, 0], [0.10183, 1]], "nearness": 1.15 },

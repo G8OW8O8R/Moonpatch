@@ -1,12 +1,12 @@
 {
   "look": 0.5,
   "hotspots": {
-    "07-plaid-blanket": [0.4, 0.5],
-    "08-dried-wreath": [0.44, 0.5],
-    "09-ceramic-pumpkins": [0.48, 0.5],
-    "10-amber-candle": [0.52, 0.5],
-    "11-stoneware-mug": [0.56, 0.5],
-    "12-beeswax-tapers": [0.6, 0.5]
+    "07-plaid-blanket": [0.2777, 0.482],
+    "08-dried-wreath": [0.5009, 0.4627],
+    "09-ceramic-pumpkins": [0.1981, 0.6993],
+    "10-amber-candle": [0.5246, 0.6209],
+    "11-stoneware-mug": [0.793, 0.6144],
+    "12-beeswax-tapers": [0.7636, 0.4164]
   },
   "layers": [
     { "id": "door-left", "side": "left", "edge": [[0.12613, 0], [0.12663, 1]], "nearness": 1.15 },
