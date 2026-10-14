@@ -1112,9 +1112,12 @@
 
 /* Products in the rooms: a seed over each, and the card that opens out of it. */
 @layer components {
-  /* A fingertip-sized button around each product's seed: a paper dot in a thin breathing ring. */
+  /* Over each product, a 40 px paper disc with its card's mark (recipe or tag) inside a wide, faint,
+     breathing ring; the button is the disc, a fingertip's reach. */
   .seed {
-    --ring: 26px;
+    --disc: 40px;
+    --ring: 104px;
+    --ring-from: 0.385; /* the disc's size in the ring's */
     position: absolute;
     width: 44px;
     height: 44px;
@@ -1125,18 +1128,15 @@
   }
 
   .seed:focus-visible {
-    outline-offset: -6px;
+    outline-offset: 2px;
   }
 
-  /* Dot and ring, with the same dark hug the header's marks have, so they hold on a bright wall. */
   .seed-mark {
     position: absolute;
     inset: 0;
-    filter: drop-shadow(0 0 0.5px var(--header-halo)) drop-shadow(0 0 1.5px color-mix(in srgb, var(--header-halo) 80%, transparent))
-      drop-shadow(0 1px 3px color-mix(in srgb, var(--header-halo) 35%, transparent));
   }
 
-  .seed-dot,
+  .seed-disc,
   .seed-ring {
     position: absolute;
     left: 50%;
@@ -1144,49 +1144,82 @@
     border-radius: var(--radius-pill);
   }
 
-  .seed-dot {
-    width: 8px;
-    height: 8px;
-    margin: -4px 0 0 -4px;
-    background: currentColor;
+  .seed-disc {
+    display: grid;
+    place-items: center;
+    width: var(--disc);
+    height: var(--disc);
+    margin: calc(var(--disc) / -2) 0 0 calc(var(--disc) / -2);
+    background: var(--color-paper);
+    color: var(--color-ink);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--color-ink) 25%, transparent);
+    transition: transform var(--duration-ui) var(--ease-out);
   }
 
-  /* 26 px, breathing out (1 → 1.5, fading) every 2.4 s; each seed a little out of step with the next. */
+  .seed-icon,
+  .seed-icon .mask-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .seed-icon {
+    transition: transform var(--duration-ui) var(--ease-out);
+  }
+
   .seed-ring {
     width: var(--ring);
     height: var(--ring);
     margin: calc(var(--ring) / -2) 0 0 calc(var(--ring) / -2);
+    pointer-events: none;
+  }
+
+  /* A slow breath (0.92 → 1, fading 0.35 → 0.15, 3 s), each ring at its own point in the breath. */
+  .seed-ring-line {
+    position: absolute;
+    inset: 0;
     border: 1px solid currentColor;
-    opacity: 0.7;
-    animation: seed-breathe 2.4s var(--ease-out) infinite;
-    animation-delay: calc(var(--i) * -0.83s);
+    border-radius: inherit;
+    opacity: 0.35;
+    transform: scale(0.92);
+    animation: seed-breathe 3s ease-in-out infinite;
+    animation-delay: calc(var(--i) * -1.13s);
     transition:
       transform var(--duration-ui) var(--ease-out),
       opacity var(--duration-ui) var(--ease-out);
   }
 
-  /* Pointed at, focused or open: the ring opens to 34 px and holds still. */
-  .seed:is(:hover, :focus-visible, [data-open]) .seed-ring {
-    animation: none;
-    opacity: 0.7;
-    transform: scale(calc(34 / 26));
-  }
-
   @keyframes seed-breathe {
-    from {
-      opacity: 0.7;
+    50% {
+      opacity: 0.15;
       transform: scale(1);
     }
-    to {
-      opacity: 0;
-      transform: scale(1.5);
-    }
   }
 
-  /* Landed in the room: the seeds come up one after another, just past full size and back. */
-  .room-ui[data-arrived] .seed-mark {
-    animation: seed-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-    animation-delay: calc(300ms + var(--i) * 70ms);
+  /* Pointed at, focused or open: the disc lifts, its mark turns a little, the ring holds still and full. */
+  .seed:is(:hover, :focus-visible, [data-open]) .seed-disc {
+    transform: scale(1.08);
+  }
+
+  .seed:is(:hover, :focus-visible, [data-open]) .seed-icon {
+    transform: rotate(8deg);
+  }
+
+  .seed:is(:hover, :focus-visible, [data-open]) .seed-ring-line {
+    animation: none;
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* Landed in the room: the discs come up one after another, just past full size and back,
+     and each ring spreads out of its disc. */
+  .room-ui[data-arrived] .seed-disc {
+    animation: seed-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+    animation-delay: calc(300ms + var(--i) * 80ms);
+  }
+
+  .room-ui[data-arrived] .seed-ring {
+    animation: seed-ring-out 700ms var(--ease-out) backwards;
+    animation-delay: calc(560ms + var(--i) * 80ms);
   }
 
   @keyframes seed-in {
@@ -1195,26 +1228,33 @@
     }
   }
 
-  /* The product's name beside its seed, in the type alone, sliding 6 px out of its own line. */
+  @keyframes seed-ring-out {
+    from {
+      opacity: 0;
+      transform: scale(var(--ring-from));
+    }
+  }
+
+  /* The product's name beside its disc, in the type alone, sliding 6 px out of its own line. */
   .seed-label {
     position: absolute;
-    left: calc(50% + 22px);
+    left: calc(50% + var(--disc) / 2 + 12px);
     top: 50%;
     padding: 0.15em 0.3em 0.25em;
     margin-top: -0.85em;
-    font-size: clamp(16px, 1.1vw, 18px);
+    font-size: 17px;
     font-style: italic;
     line-height: 1.2;
     font-variation-settings: "opsz" 24, "SOFT" 50, "WONK" 0;
     white-space: nowrap;
     text-shadow: var(--hug-room);
-    clip-path: inset(-0.3em 0 -0.3em 0);
+    clip-path: inset(-0.3em -0.3em -0.3em -0.3em);
     pointer-events: none;
   }
 
   .seed[data-side="left"] .seed-label {
     left: auto;
-    right: calc(50% + 22px);
+    right: calc(50% + var(--disc) / 2 + 12px);
   }
 
   .seed-label-line {
@@ -1233,6 +1273,15 @@
   .seed:is(:hover, :focus-visible):not([data-open]) .seed-label-line {
     opacity: 1;
     transform: none;
+  }
+
+  /* Phones: a smaller disc and ring. */
+  @media (max-width: 639px) {
+    .seed {
+      --disc: 36px;
+      --ring: 80px;
+      --ring-from: 0.45;
+    }
   }
 
   .card-layer {
@@ -1570,8 +1619,9 @@
       animation: none;
     }
 
-    .seed-ring,
-    .room-ui[data-arrived] .seed-mark {
+    .seed-ring-line,
+    .room-ui[data-arrived] .seed-disc,
+    .room-ui[data-arrived] .seed-ring {
       animation: none;
     }
 

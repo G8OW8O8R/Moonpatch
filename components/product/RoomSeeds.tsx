@@ -1,5 +1,6 @@
 "use client";
 
+import { Icon } from "@/components/ui/Icon";
 import { type CSSProperties, type Ref, useLayoutEffect, useRef, useState } from "react";
 import { type Hotspot, hotspotsIn, onScreen } from "@/lib/hotspots";
 import type { Locale } from "@/lib/i18n";
@@ -28,9 +29,9 @@ export interface RoomSeedsProps {
 const LABEL_FLIP = 0.72;
 
 /**
- * Over each product in the room, a button the size of a fingertip around a
- * small paper seed with a breathing ring, named after the product beside it
- * when pointed at or focused. Laid out as the room rests on this screen
+ * Over each product in the room, a paper disc with the mark of its card (a
+ * recipe or a tag) inside a wide breathing ring, named after the product
+ * beside it when pointed at or focused. Laid out as the room rests on this screen
  * (looking where it first looks); a pan moves the whole layer with the picture.
  */
 export function RoomSeeds({ room, lang, t, roomTitle, open, onOpen, ref }: RoomSeedsProps) {
@@ -82,8 +83,12 @@ export function RoomSeeds({ room, lang, t, roomTitle, open, onOpen, ref }: RoomS
               }}
             >
               <span aria-hidden="true" className="seed-mark">
-                <span className="seed-ring" />
-                <span className="seed-dot" />
+                <span className="seed-ring">
+                  <span className="seed-ring-line" />
+                </span>
+                <span className="seed-disc">
+                  <Icon name={hotspot.product.card} className="seed-icon" />
+                </span>
               </span>
               <span className="seed-label font-display">
                 <span className="seed-label-line">{name}</span>

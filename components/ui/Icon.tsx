@@ -11,7 +11,9 @@ export type IconName =
   | "minus"
   | "pin"
   | "calendar"
-  | "ticket";
+  | "ticket"
+  | "recipe"
+  | "tag";
 
 /**
  * Decorative by design: the meaning always lives in adjacent text.
