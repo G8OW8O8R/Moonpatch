@@ -41,6 +41,8 @@
   },
   "rooms": {
     "back": "Back to the square",
+    "nextDoor": "Next door",
+    "swipe": "Swipe to look around",
     "cafe": {
       "title": "Café",
       "description": "Cider donuts, pumpkin bread and something warm to hold, in the cream café with the sage door.",

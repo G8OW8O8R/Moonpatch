@@ -40,6 +40,14 @@ export interface DoorParams {
   exposure: number;
   /** A move turned back on itself swings round over this long, seconds. */
   turn: number;
+  /** Length of a move from one building straight to another, seconds. */
+  crossDuration: number;
+  /** Share of that move each room takes (out of the first, into the second); the square has the rest. */
+  crossCut: number;
+  /** How far the square is still magnified halfway between the two doors. */
+  zMid: number;
+  /** The camera's pace halfway between the doors (1 at the cuts). */
+  midPace: number;
 }
 
 export const defaultDoor: Readonly<DoorParams> = {
@@ -56,6 +64,11 @@ export const defaultDoor: Readonly<DoorParams> = {
   leafRate: 1.6,
   exposure: 0.08,
   turn: 0.12,
+  crossDuration: duration.sceneLong,
+  // 300 ms of 1200.
+  crossCut: 0.25,
+  zMid: 1.35,
+  midPace: 0.55,
 };
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
@@ -234,20 +247,25 @@ export function roomZoom(j: number, params: DoorParams = defaultDoor): number {
 export const inRoom = (j: number) => j >= 0.5;
 
 /**
- * The push-in on a door, on top of the square's own window: magnified about
- * the door, which glides to the middle of the screen on the way.
+ * A push-in of `z` on a point of the square plate (plate px), on top of the
+ * square's own window: magnified about the point, which glides to the middle
+ * of the screen as the magnification nears the cut's.
  */
-export function doorShift(viewport: Size, base: PlateWindow, room: RoomId, j: number, params: DoorParams = defaultDoor): Shift {
-  const z = squareZoom(j, params);
-  const door = onScreen(base, DOORS[room].x, DOORS[room].y);
+function pushShift(viewport: Size, base: PlateWindow, point: Vec2, z: number, params: DoorParams): Shift {
+  const at = onScreen(base, point.x, point.y);
   const glide = params.zCut > 1 ? (z - 1) / (params.zCut - 1) : 0;
   const centre = { x: viewport.width / 2, y: viewport.height / 2 };
-  return { scale: z, about: door, by: { x: (centre.x - door.x) * glide, y: (centre.y - door.y) * glide } };
+  return { scale: z, about: at, by: { x: (centre.x - at.x) * glide, y: (centre.y - at.y) * glide } };
 }
 
-/** The room's window at this point of the journey (before any drift with the pointer). */
-export function roomWindow(viewport: Size, j: number, params: DoorParams = defaultDoor): PlateWindow {
-  const box = roomBox(viewport, roomZoom(j, params));
+/** The push-in on a door, on top of the square's own window. */
+export function doorShift(viewport: Size, base: PlateWindow, room: RoomId, j: number, params: DoorParams = defaultDoor): Shift {
+  return pushShift(viewport, base, DOORS[room], squareZoom(j, params), params);
+}
+
+/** The room's window at this point of the journey, looking at `look` (before any drift with the pointer). */
+export function roomWindow(viewport: Size, j: number, params: DoorParams = defaultDoor, look = 0.5): PlateWindow {
+  const box = roomBox(viewport, roomZoom(j, params), look);
   return { scale: box.scale, origin: { x: box.x, y: box.y } };
 }
 
@@ -257,8 +275,8 @@ const shifted = (w: PlateWindow, s: Shift): PlateWindow => ({
 });
 
 /** The plate's window at any point of the journey: the square pushed in, or the room. */
-export function journeyWindow(viewport: Size, base: PlateWindow, room: RoomId, j: number, params: DoorParams = defaultDoor): PlateWindow {
-  return inRoom(j) ? roomWindow(viewport, j, params) : shifted(base, doorShift(viewport, base, room, j, params));
+export function journeyWindow(viewport: Size, base: PlateWindow, room: RoomId, j: number, params: DoorParams = defaultDoor, look = 0.5): PlateWindow {
+  return inRoom(j) ? roomWindow(viewport, j, params, look) : shifted(base, doorShift(viewport, base, room, j, params));
 }
 
 /**
@@ -284,12 +302,15 @@ export function leafWindow(viewport: Size, room: PlateWindow, rest: PlateWindow,
  * point x travels along k·x + b. Zooms give a radial field, slides a straight
  * one; only its shape matters, the blur's strength comes from the pace.
  */
-export function cameraField(viewport: Size, base: PlateWindow, room: RoomId, j: number, params: DoorParams = defaultDoor): { k: number; b: Vec2 } {
+export function cameraField(viewport: Size, base: PlateWindow, room: RoomId, j: number, params: DoorParams = defaultDoor, look = 0.5): { k: number; b: Vec2 } {
   const h = 1e-3;
   // Measured on the side of the cut the point is on: the cut itself is no motion.
   const [j0, j1] = inRoom(j) ? [Math.max(0.5, j - h), Math.max(0.5, j - h) + h] : [Math.min(0.5 - h, j), Math.min(0.5 - h, j) + h];
-  const a = journeyWindow(viewport, base, room, j0, params);
-  const c = journeyWindow(viewport, base, room, j1, params);
+  return fieldBetween(journeyWindow(viewport, base, room, j0, params, look), journeyWindow(viewport, base, room, j1, params, look), h);
+}
+
+/** The field that takes window a to window c over a step h. */
+function fieldBetween(a: PlateWindow, c: PlateWindow, h: number): { k: number; b: Vec2 } {
   const k = (c.scale - a.scale) / a.scale / h;
   return { k, b: { x: (c.origin.x - a.origin.x) / h - k * a.origin.x, y: (c.origin.y - a.origin.y) / h - k * a.origin.y } };
 }
@@ -313,4 +334,96 @@ export function exposureMix(j: number, params: DoorParams = defaultDoor): number
   const from = legAt(1, Math.max(0, cutTime(params) * params.duration - params.exposure), params).j;
   const t = clamp01((j - from) / (0.5 - from));
   return t * t * (3 - 2 * t);
+}
+
+/**
+ * At the cut the leaves are seen against the square's light, not the room's:
+ * how much of a room's leaf balance applies at this point of the journey. All
+ * of it at the cut, none once the room has settled (where the room's own file
+ * takes over), easing out while the camera still brakes and blurs.
+ */
+export function leafBalanceAt(j: number): number {
+  if (!inRoom(j)) return 0;
+  const t = clamp01((j - 0.5) / 0.5);
+  return 1 - t * t * (3 - 2 * t);
+}
+
+// --------------------------------------------------------- room to room
+
+/**
+ * Straight from one building to another, without stopping on the square: out
+ * of the first room as on the way out, a cut, the square pulled back from the
+ * first door and swept across to the second (no further out than zMid), a
+ * second cut, and into the second room as on the way in. The pace is at its
+ * top at both cuts and eases off over the square between them.
+ */
+export type CrossShot = { at: "from"; j: number } | { at: "square"; s: number } | { at: "to"; j: number };
+
+export interface CrossFrame {
+  shot: CrossShot;
+  /** 0–1 of the top speed. */
+  pace: number;
+  done: boolean;
+}
+
+/** The crossing at `seconds` into it. */
+export function crossAt(seconds: number, params: DoorParams = defaultDoor): CrossFrame {
+  const t = clamp01(seconds / params.crossDuration);
+  const c = params.crossCut;
+  const done = t >= 1;
+  if (t < c) {
+    const u = t / c;
+    return { shot: { at: "from", j: 1 - 0.5 * u ** (params.rise + 1) }, pace: u ** params.rise, done };
+  }
+  if (t <= 1 - c) {
+    const s = (t - c) / (1 - 2 * c);
+    return { shot: { at: "square", s }, pace: 1 - (1 - params.midPace) * Math.sin(Math.PI * s), done };
+  }
+  const u = (t - (1 - c)) / c;
+  return { shot: { at: "to", j: 0.5 + 0.5 * (1 - (1 - u) ** (params.fall + 1)) }, pace: done ? 0 : (1 - u) ** params.fall, done };
+}
+
+/** Magnification of the square on its way across (zCut at both doors, zMid halfway). */
+export function crossZoom(s: number, params: DoorParams = defaultDoor): number {
+  const top = Math.log(params.zCut);
+  return Math.exp(top - (top - Math.log(params.zMid)) * Math.sin(Math.PI * clamp01(s)));
+}
+
+/** The point of the square the camera closes on, from one door to the other: still at both ends, fastest halfway. */
+export function crossPoint(from: RoomId, to: RoomId, s: number): Vec2 {
+  const x = clamp01(s);
+  const e = x - Math.sin(2 * Math.PI * x) / (2 * Math.PI);
+  const a = DOORS[from];
+  const b = DOORS[to];
+  return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e };
+}
+
+/** The push on top of the square's window on the way across. */
+export function crossShift(viewport: Size, base: PlateWindow, from: RoomId, to: RoomId, s: number, params: DoorParams = defaultDoor): Shift {
+  return pushShift(viewport, base, crossPoint(from, to, s), crossZoom(s, params), params);
+}
+
+/** The square's window on the way across. */
+export function crossSquareWindow(viewport: Size, base: PlateWindow, from: RoomId, to: RoomId, s: number, params: DoorParams = defaultDoor): PlateWindow {
+  return shifted(base, crossShift(viewport, base, from, to, s, params));
+}
+
+/** How the screen moves over the square on the way across (see cameraField). */
+export function crossField(viewport: Size, base: PlateWindow, from: RoomId, to: RoomId, s: number, params: DoorParams = defaultDoor): { k: number; b: Vec2 } {
+  const h = 1e-3;
+  const s0 = Math.min(1 - h, s);
+  return fieldBetween(crossSquareWindow(viewport, base, from, to, s0, params), crossSquareWindow(viewport, base, from, to, s0 + h, params), h);
+}
+
+/**
+ * How far the square's exposure has gone towards a room's on the way across:
+ * towards the first room just after the first cut, towards the second just
+ * before the second, over `exposure` seconds each.
+ */
+export function crossExposure(s: number, params: DoorParams = defaultDoor): { mix: number; room: "from" | "to" } {
+  const span = params.exposure / (params.crossDuration * (1 - 2 * params.crossCut));
+  const room = s < 0.5 ? "from" : "to";
+  if (span <= 0) return { mix: 0, room };
+  const t = clamp01(1 - Math.min(s, 1 - s) / span);
+  return { mix: t * t * (3 - 2 * t), room };
 }

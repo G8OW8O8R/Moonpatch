@@ -793,19 +793,92 @@
 
   /* ------------------------------------------------------- the rooms */
 
-  .room-back {
+  /* Opened inside a building, the gate's poster under the room is not fetched until the scene asks for it. */
+  .scene-stage[data-hold-poster] .gate-poster {
+    display: none;
+  }
+
+  /* The room at rest, framed as the scene frames it: the cover fit at the resting zoom, looking at --look. */
+  .room-plate {
+    container-type: size;
+  }
+
+  .room-plate img {
+    --w: calc(max(100cqw, 100cqh * 2576 / 1438) * 1.04);
+    --h: calc(max(100cqh, 100cqw * 1438 / 2576) * 1.04);
+    position: absolute;
+    max-width: none;
+    width: var(--w);
+    height: var(--h);
+    left: clamp(calc(100cqw - var(--w)), calc(50cqw - var(--look) * var(--w)), 0px);
+    top: calc((100cqh - var(--h)) / 2);
+  }
+
+  /* The way back and the doors next to it, under the wordmark: type only, in the header's colour and hug. */
+  .room-nav {
     position: absolute;
     left: var(--spacing-gutter);
     top: calc(var(--spacing-gutter) + clamp(140px, 16vw, 300px) * 2746.75 / 8789 + 0.75rem);
+    display: grid;
+    gap: 0.25rem;
+    color: var(--header-ink);
+    font-size: var(--text-ui);
+    line-height: 1.5;
+  }
+
+  .room-nav,
+  .room-hint {
+    text-shadow: var(--hug-room);
+  }
+
+  .room-link {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    color: var(--color-paper);
     font-weight: 500;
-    text-shadow:
-      0 0 1px rgb(43 33 28 / 0.75),
-      0 1px 2px rgb(43 33 28 / 0.6);
+    text-underline-offset: 0.2em;
   }
+
+  .room-link:hover {
+    text-decoration: underline;
+  }
+
+  .room-icon {
+    filter: drop-shadow(0 0 0.5px var(--header-halo)) drop-shadow(0 0 1px var(--header-halo))
+      drop-shadow(0 0 2px color-mix(in srgb, var(--header-halo) 80%, transparent))
+      drop-shadow(0 0 5px color-mix(in srgb, var(--header-halo) 30%, transparent));
+  }
+
+  .room-hint {
+    position: absolute;
+    left: 50%;
+    bottom: calc(var(--spacing-gutter) + env(safe-area-inset-bottom));
+    translate: -50% 0;
+    color: var(--header-ink);
+    font-size: var(--text-ui);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity var(--duration-tap) var(--ease-out);
+  }
+
+  .room-hint[data-shown] {
+    opacity: 1;
+  }
+}
+
+/* Inside a building the header's hug is denser at the glyph edge (the photograph runs bright right
+   up to the type there): still a shadow at the letter, never a glow, never an outline. Built on the
+   halo colour itself, which is defined up here, and only from blurs the square's hug already uses,
+   so the first cut into a room never waits on a new one being prepared. */
+:root {
+  --hug-room:
+    1px 0 1px var(--header-halo), -1px 0 1px var(--header-halo), 0 1px 1px var(--header-halo), 0 -1px 1px var(--header-halo), 0 0 1px var(--header-halo), 0 0 1px var(--header-halo), 0 0 2px var(--header-halo),
+    0 0 2px var(--header-halo), 0 0 2px var(--header-halo), 0 0 3px var(--header-halo), 0 0 4px color-mix(in srgb, var(--header-halo) 60%, transparent),
+    0 0 8px color-mix(in srgb, var(--header-halo) 30%, transparent);
+}
+
+:root:has([data-inside]) .site-header .text-shadow-hug {
+  text-shadow: var(--hug-room);
 }
 
 @media (prefers-reduced-motion: reduce) {

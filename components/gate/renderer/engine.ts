@@ -5,15 +5,21 @@
  * something moves.
  */
 import {
+  type CrossShot,
   type DoorParams,
   type Head,
   type Leg,
   type Move,
   blurOf,
   cameraField,
+  crossAt,
+  crossExposure,
+  crossField,
+  crossShift,
   doorShift,
   exposureMix,
   inRoom,
+  leafBalanceAt,
   legAt,
   moveAt,
   paceOf,
@@ -25,7 +31,7 @@ import { type PosterPlate, type Size, roomBox } from "@/lib/plate-box";
 import { ROOMS, ROOM_IDS, type RoomId } from "@/lib/rooms";
 import { type SpringState, isSettled, stepSpring } from "@/lib/spring";
 import { type ArmId, BOARD_WRITING, type PropQuad, openedBoard } from "@/lib/square-props";
-import { squareFrame, windowAt } from "@/lib/square-rig";
+import { type Shift, squareFrame, windowAt } from "@/lib/square-rig";
 import { MotionBlurPass } from "./blur";
 import { type FrameStats, GateRenderer, type GateImages, gateLayers } from "./GateRenderer";
 import { GRAIN_FPS, GrainPass } from "./grain";
@@ -41,6 +47,8 @@ export interface DoorSeek {
   leg: Leg;
   /** Milliseconds into the move. */
   ms: number;
+  /** Straight on from `room` into this building instead (leg is then ignored). */
+  to?: RoomId;
 }
 
 export interface PosterInfo {
@@ -62,6 +70,8 @@ export interface EngineSetup {
   /** Development only: hold the gate renderer ("gate") or draw the square without its props ("plate"), to compare frames. */
   debugLayer?: "gate" | "plate";
   door: DoorParams;
+  /** Where the camera starts: a page opened on a building's own address starts inside it. */
+  place: ScenePlace;
 }
 
 export interface EngineEvents {
@@ -95,6 +105,8 @@ export interface Engine {
   setDoor(params: DoorParams): void;
   /** Where a mouse points, -1…1 across the screen; null when it has left. */
   setPointer(at: { x: number; y: number } | null): void;
+  /** Where a narrow screen looks inside the room (a share of the plate's width). */
+  setLook(look: number): void;
   seek(at: DoorSeek | null): void;
   resize(css: Size, dpr: number): void;
   setActive(active: boolean): void;
@@ -112,6 +124,7 @@ export type ToWorker =
   | { type: "place"; place: ScenePlace }
   | { type: "door"; params: DoorParams }
   | { type: "pointer"; at: { x: number; y: number } | null }
+  | { type: "look"; look: number }
   | { type: "seek"; at: DoorSeek | null }
   | { type: "resize"; css: Size; dpr: number }
   | { type: "active"; active: boolean }
@@ -174,8 +187,22 @@ async function loadSquareImages(css: Size, dpr: number): Promise<SquareImages> {
   };
 }
 
-/** Rooms load in this order: the café is the door the ride faces. */
-const ROOM_ORDER: readonly RoomId[] = ["cafe", ...ROOM_IDS.filter((id) => id !== "cafe")];
+/** Rooms load in this order: the one the page opened in, else the café, the door the ride faces. */
+const roomOrder = (first: RoomId): RoomId[] => [first, ...ROOM_IDS.filter((id) => id !== first)];
+
+/** A move asked for while another plays waits for it to land, then goes this much faster. */
+const HURRY = 1.5;
+
+const hurried = (params: DoorParams): DoorParams => ({ ...params, duration: params.duration / HURRY, crossDuration: params.crossDuration / HURRY });
+
+/** A move from one building straight to another. */
+interface Cross {
+  from: RoomId;
+  to: RoomId;
+  start: number;
+  /** The look in the room it leaves. */
+  look: number;
+}
 
 /** Width of the room files for this screen. */
 const roomWidthFor = (css: Size, dpr: number) => (roomBox(css).scale * dpr > FULL_SIZE_FROM ? 2576 : 1600);
@@ -259,15 +286,28 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
 
   // The camera between the square and the buildings.
   let door = setup.door;
+  /** The timing of the move in flight (the door's own, or hurried). */
+  let moveParams = door;
+  let hurry = false;
   let roomRenderer: RoomRenderer | null = null;
   let blurPass: MotionBlurPass | null = null;
   /** Where the page wants the camera. */
-  let wanted: ScenePlace = "square";
+  let wanted: ScenePlace = setup.place;
   /** The building the journey leads into (kept while inside it, and on the way back). */
-  let journeyRoom: RoomId | null = null;
+  let journeyRoom: RoomId | null = setup.place === "square" ? null : setup.place;
   /** Where the journey rests between moves: 0 on the square, 1 inside. */
-  let journeyJ = 0;
+  let journeyJ = journeyRoom ? 1 : 0;
   let move: Move | null = null;
+  let cross: Cross | null = null;
+  /** The side of the last cut a crossing has shown. */
+  let crossSide: ScenePlace = "square";
+  /** Opened inside a building: the page is told once the room is on the canvas, at rest. */
+  let announce: RoomId | null = journeyRoom;
+  let announceFrames = 0;
+  /** Where a narrow screen looks inside the room, and where that look started. */
+  let lookStart = journeyRoom ? ROOMS[journeyRoom].look : 0.5;
+  let look = lookStart;
+  let lookMoved = false;
   let pointerMoved = false;
   let journeyFrames: number[] = [];
   let seekAt: DoorSeek | null = null;
@@ -310,11 +350,43 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     // Between the square and a building: the move plays here, off the page's thread.
     let head: Head | null = null;
     let leg: Leg = 1;
+    // Straight from one building to another (or a held moment of it).
+    const crossing = seekAt?.to ? { from: seekAt.room, to: seekAt.to, seconds: seekAt.ms / 1000, look: ROOMS[seekAt.room].look } : cross && { ...cross, seconds: now / 1000 - cross.start };
+    if (crossing && squareRenderer && roomRenderer?.has(crossing.from) && roomRenderer.has(crossing.to)) {
+      const step = crossAt(crossing.seconds, seekAt ? door : moveParams);
+      drawCross(crossing.from, crossing.to, step.shot, step.pace, crossing.look, now);
+      if (seekAt) {
+        if (seekShown !== seekAt) {
+          seekShown = seekAt;
+          events.onSeeked(seekAt.ms);
+        }
+        lastFrame = 0;
+        return;
+      }
+      if (dt > 0) journeyFrames.push(dt * 1000);
+      const side: ScenePlace = step.shot.at === "from" ? crossing.from : step.shot.at === "square" ? "square" : crossing.to;
+      if (side !== crossSide) {
+        crossSide = side;
+        events.onCut(side);
+      }
+      if (step.done) {
+        cross = null;
+        journeyRoom = crossing.to;
+        journeyJ = 1;
+        events.onJourney(journeyFrames);
+        journeyFrames = [];
+        events.onPlaced(crossing.to);
+        startMove();
+      }
+      renderer.recordFrame(now);
+      schedule();
+      return;
+    }
     if (seekAt) {
       head = legAt(seekAt.leg, seekAt.ms / 1000, door);
       leg = seekAt.leg;
     } else if (move) {
-      const step = moveAt(move, now / 1000, door);
+      const step = moveAt(move, now / 1000, moveParams);
       head = step.head;
       leg = step.leg;
       if (dt > 0) journeyFrames.push(dt * 1000);
@@ -337,8 +409,9 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     // Inside, a mouse moves the room a little.
     const aim = journeying && inRoom(j) ? pointer : { x: 0, y: 0 };
     drift = { x: stepSpring(drift.x, aim.x, dt, POINTER_SPRING), y: stepSpring(drift.y, aim.y, dt, POINTER_SPRING) };
-    const drifting = pointerMoved || !isSettled(drift.x, aim.x) || !isSettled(drift.y, aim.y);
+    const drifting = pointerMoved || lookMoved || !isSettled(drift.x, aim.x) || !isSettled(drift.y, aim.y);
     pointerMoved = false;
+    lookMoved = false;
 
     if (journeying) {
       drawJourney(shownRoom!, j, head, leg, now);
@@ -346,7 +419,13 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
         seekShown = seekAt;
         events.onSeeked(seekAt.ms);
       }
-      if (move || drifting) {
+      // Opened inside: the page swaps its picture for the canvas once a frame of the room at rest is on it.
+      const announcing = !!announce && announce === shownRoom && !move && !seekAt && j >= 1 && roomRenderer!.hasPlate(announce);
+      if (announcing && ++announceFrames >= 2) {
+        events.onPlaced(announce!);
+        announce = null;
+      }
+      if (move || drifting || announce) {
         renderer.recordFrame(now);
         schedule();
       } else lastFrame = 0;
@@ -394,60 +473,125 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
 
   /** One frame of the journey: the square pushed in on the door, or the room, blurred as fast as it moves. */
   function drawJourney(room: RoomId, j: number, head: Head | null, leg: Leg, now: number) {
+    const params = seekAt ? door : moveParams;
+    const base = windowAt(squareFrame(css, square));
+    const blur = head ? blurOf(paceOf(head, leg, params), params) : 0;
+    const roomLook = inRoom(j) ? look : 0.5;
+    const field = () => cameraField(css, base, room, j, params, roomLook);
+    if (inRoom(j)) drawShot({ room, j, look, lookStart }, blur, field, 0, null, now);
+    else drawShot({ camera: doorShift(css, base, room, j, params) }, blur, field, exposureMix(j, params), room, now);
+  }
+
+  /** One frame straight from one building to another. */
+  function drawCross(from: RoomId, to: RoomId, shot: CrossShot, pace: number, fromLook: number, now: number) {
+    const params = seekAt ? door : moveParams;
+    const base = windowAt(squareFrame(css, square));
+    const blur = blurOf(pace, params);
+    if (shot.at === "square") {
+      const exposure = crossExposure(shot.s, params);
+      drawShot({ camera: crossShift(css, base, from, to, shot.s, params) }, blur, () => crossField(css, base, from, to, shot.s, params), exposure.mix, exposure.room === "from" ? from : to, now);
+      return;
+    }
+    const room = shot.at === "from" ? from : to;
+    const roomLook = shot.at === "from" ? fromLook : ROOMS[to].look;
+    drawShot({ room, j: shot.j, look: roomLook, lookStart: roomLook }, blur, () => cameraField(css, base, room, shot.j, params, roomLook), 0, null, now);
+  }
+
+  /** Draws the room or the pushed-in square, then smears it along the camera's field and matches its light. */
+  function drawShot(
+    shot: { room: RoomId; j: number; look: number; lookStart: number } | { camera: Shift },
+    blur: number,
+    field: () => { k: number; b: { x: number; y: number } },
+    exposure: number,
+    other: RoomId | null,
+    now: number,
+  ) {
     const gate = renderer!;
     const size = gate.size;
     const ratio = gate.devicePixelRatio;
     const seconds = (now - started) / 1000;
-    const base = windowAt(squareFrame(css, square));
-    const blur = head ? blurOf(paceOf(head, leg, door), door) : 0;
-    const exposure = exposureMix(j, door);
+    const params = seekAt ? door : moveParams;
     const buffered = !!blurPass && (blur > 0.05 || exposure > 0);
     const into = buffered ? blurPass!.target(size.width, size.height).framebuffer : null;
-    if (inRoom(j)) {
-      roomRenderer!.render(room, { j, drift: { x: drift.x.value, y: drift.y.value }, params: door, into }, css, ratio, size);
+    if ("room" in shot) {
+      const { room, j } = shot;
+      roomRenderer!.render(
+        room,
+        { j, drift: { x: drift.x.value, y: drift.y.value }, look: shot.look, lookStart: shot.lookStart, balance: leafBalanceAt(j), params, into },
+        css,
+        ratio,
+        size,
+      );
     } else {
-      squareRenderer!.render(square, css, ratio, seconds, size, { into, camera: doorShift(css, base, room, j, door) });
+      squareRenderer!.render(square, css, ratio, seconds, size, { into, camera: shot.camera });
     }
     if (buffered) {
-      const field = unitField(css, cameraField(css, base, room, j, door));
+      const unit = unitField(css, field());
       blurPass!.draw({
-        k: field.k,
-        b: { x: field.b.x * ratio, y: field.b.y * ratio },
+        k: unit.k,
+        b: { x: unit.b.x * ratio, y: unit.b.y * ratio },
         length: blur,
-        floor: door.blurCentre * ratio,
+        floor: params.blurCentre * ratio,
         exposure,
-        other: exposure > 0 ? roomRenderer!.meanSource(room) : null,
+        other: exposure > 0 && other ? roomRenderer!.meanSource(other) : null,
       });
     }
     // Film on the square only: the room at rest is the very file the page shows.
-    if (!inRoom(j)) grain?.draw(1, seconds, size, ratio, null);
+    if (!("room" in shot)) grain?.draw(1, seconds, size, ratio, null);
+  }
+
+  /** The timing for a move about to start: hurried if it had to wait for another to land. */
+  function begin() {
+    moveParams = hurry ? hurried(door) : door;
+    hurry = false;
+    journeyFrames = [];
   }
 
   /** Starts, or turns around, the move towards where the page wants the camera. */
   function startMove() {
     if (seekAt) return;
     const now = performance.now() / 1000;
+    // Straight across from one building to another: whatever is wanted next waits for it to land.
+    if (cross) {
+      if (wanted !== cross.to) hurry = true;
+      return;
+    }
     if (wanted === "square") {
       if (!journeyRoom) return;
       if (move) {
-        if (move.leg === 1) move = turnAround(move, now, door);
+        if (move.leg === 1) move = turnAround(move, now, moveParams);
       } else if (journeyJ > 0) {
-        journeyFrames = [];
+        begin();
         move = { kind: "leg", leg: -1, start: now };
       }
       schedule();
       return;
     }
-    // Room to room comes with the other buildings; until then a journey ends where it began.
-    if (journeyRoom && journeyRoom !== wanted) return;
+    if (!squareRenderer || !roomRenderer?.has(wanted)) return;
+    if (journeyRoom && journeyRoom !== wanted) {
+      // Another building: from inside one, straight across; on the way in or out, once it has landed.
+      if (move) {
+        hurry = true;
+        return;
+      }
+      if (journeyJ < 1 || !roomRenderer.has(journeyRoom)) return;
+      begin();
+      void loadPlate(wanted);
+      cross = { from: journeyRoom, to: wanted, start: now, look };
+      crossSide = journeyRoom;
+      look = lookStart = ROOMS[wanted].look;
+      schedule();
+      return;
+    }
     // Waits until the ride has landed and the room is on the GPU.
-    if (!squareRenderer || !roomRenderer?.has(wanted) || ride !== 1 || rideTarget !== 1) return;
+    if (ride !== 1 || rideTarget !== 1) return;
+    if (journeyRoom !== wanted) look = lookStart = ROOMS[wanted].look;
     journeyRoom = wanted;
     void loadPlate(wanted);
     if (move) {
-      if (move.leg === -1) move = turnAround(move, now, door);
+      if (move.leg === -1) move = turnAround(move, now, moveParams);
     } else if (journeyJ < 1) {
-      journeyFrames = [];
+      begin();
       move = { kind: "leg", leg: 1, start: now };
     }
     schedule();
@@ -476,7 +620,7 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
     if (!renderer || !roomRenderer || !blurPass) return;
     const size = renderer.size;
     const into = blurPass.target(size.width, size.height).framebuffer;
-    roomRenderer.render(room, { j: 0.5, drift: { x: 0, y: 0 }, params: door, into }, css, renderer.devicePixelRatio, size);
+    roomRenderer.render(room, { j: 0.5, drift: { x: 0, y: 0 }, look: ROOMS[room].look, params: door, into }, css, renderer.devicePixelRatio, size);
     gl!.bindFramebuffer(gl!.FRAMEBUFFER, null);
   }
 
@@ -491,7 +635,7 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
         }
         roomRenderer = rooms;
         blurPass = blur;
-        for (const room of ROOM_ORDER) {
+        for (const room of roomOrder(journeyRoom ?? "cafe")) {
           const images = await loadRoomImages(room, css, dpr, posterFormat(setup.poster));
           if (disposed) {
             images.clean.close();
@@ -643,6 +787,12 @@ export function runGate(canvas: HTMLCanvasElement | OffscreenCanvas, setup: Engi
         pointerMoved = true;
         schedule();
       }
+    },
+    setLook(next) {
+      if (next === look || move || cross || !journeyRoom || journeyJ < 1) return;
+      look = next;
+      lookMoved = true;
+      schedule();
     },
     seek(at) {
       seekAt = at;

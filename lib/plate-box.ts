@@ -199,7 +199,9 @@ export function squareBox(viewport: Size): PlateBox {
 export const DOORS: Readonly<Record<"cafe" | "barn" | "haunt", Readonly<{ x: number; y: number }>>> = {
   barn: { x: 522, y: 812 },
   cafe: { x: 1290, y: 815 },
-  haunt: { x: 2090, y: 790 },
+  // The head of the shop door, between its two windows: closing on it, the signpost below
+  // leaves the frame over 50 ms before the cut, already blurred for the 50 ms before that.
+  haunt: { x: 2088, y: 640 },
 };
 
 /**
@@ -209,9 +211,23 @@ export const DOORS: Readonly<Record<"cafe" | "barn" | "haunt", Readonly<{ x: num
  */
 export const ROOM_REST_ZOOM = 1.04;
 
-/** Where a room plate sits on this viewport: the cover fit magnified about the screen's centre. */
-export function roomBox(viewport: Size, zoom: number = ROOM_REST_ZOOM): PlateBox {
-  return framedBox(viewport, PLATE, { x: 0.5, y: 0.5, zoom, focus: { u: 0.5, v: 0.5 } });
+/**
+ * Where a room plate sits on this viewport: the cover fit magnified about the
+ * screen's centre, looking at `look` (a share of the plate's width) as far
+ * as the plate allows. A narrow screen sees a slice of the room and can pan
+ * across it; a wide one sees all of it whatever the look.
+ */
+export function roomBox(viewport: Size, zoom: number = ROOM_REST_ZOOM, look = 0.5): PlateBox {
+  const box = framedBox(viewport, PLATE, { x: 0.5, y: 0.5, zoom, focus: { u: 0.5, v: 0.5 } });
+  const x = Math.min(0, Math.max(viewport.width - box.width, viewport.width / 2 - look * box.width)) + 0;
+  return { ...box, x };
+}
+
+/** The looks a room can pan between on this viewport (equal where the whole room is in view). */
+export function lookRange(viewport: Size, zoom: number = ROOM_REST_ZOOM): { min: number; max: number } {
+  const { width } = roomBox(viewport, zoom);
+  const half = Math.min(0.5, viewport.width / width / 2);
+  return { min: half, max: 1 - half };
 }
 
 /** CSS `object-position` that reproduces `plateBox` for the same anchor. */

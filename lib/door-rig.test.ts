@@ -3,12 +3,19 @@ import {
   blurOf,
   cameraSlope,
   cameraField,
+  crossAt,
+  crossExposure,
+  crossField,
+  crossPoint,
+  crossSquareWindow,
+  crossZoom,
   cutProgress,
   cutTime,
   defaultDoor,
   doorShift,
   exposureMix,
   journeyWindow,
+  leafBalanceAt,
   leafWindow,
   legAt,
   moveAt,
@@ -20,7 +27,8 @@ import {
   unitField,
 } from "./door-rig";
 import { DOORS, ROOM_REST_ZOOM, roomBox } from "./plate-box";
-import { onScreen, squareFrame, windowAt } from "./square-rig";
+import { propPlacement, quadOnScreen, signQuads } from "./square-props";
+import { onScreen, shiftWindow, squareFrame, windowAt } from "./square-rig";
 
 const desktop = { width: 1536, height: 864 };
 const base = windowAt(squareFrame(desktop, { dusk: 1, wander: 1 }));
@@ -220,5 +228,86 @@ describe("exposure at the cut", () => {
     expect(exposureMix(legAt(1, ms(340)).j)).toBeGreaterThan(0);
     expect(exposureMix(0.4999999)).toBeCloseTo(1, 3);
     expect(exposureMix(0.6)).toBe(0);
+  });
+});
+
+describe("into the haunt shop", () => {
+  it("has the signpost's lettering out of the frame for the last 50 ms before the cut", () => {
+    const frame = squareFrame(desktop, { dusk: 1, wander: 1 });
+    const arms = signQuads(propPlacement(desktop).sign).filter((q) => q.id.startsWith("arm-"));
+    for (let t = 332; t < 382; t += 5) {
+      const camera = doorShift(desktop, base, "haunt", legAt(1, ms(t)).j);
+      for (const arm of arms) expect(quadOnScreen(shiftWindow(windowAt(frame, arm.nearness), camera), arm.rect).y).toBeGreaterThan(desktop.height);
+    }
+  });
+});
+
+describe("the leaves' balance", () => {
+  it("is whole at the cut and gone once the room has settled", () => {
+    expect(leafBalanceAt(0.3)).toBe(0);
+    expect(leafBalanceAt(0.5)).toBe(1);
+    expect(leafBalanceAt(legAt(1, ms(500)).j)).toBeLessThan(0.5);
+    expect(leafBalanceAt(1)).toBe(0);
+  });
+});
+
+describe("from one building to another", () => {
+  const sec = (t: number) => crossAt(ms(t));
+
+  it("cuts out of the first room at 300 ms and into the second at 900 ms of 1200", () => {
+    expect(sec(299).shot.at).toBe("from");
+    expect(sec(301).shot.at).toBe("square");
+    expect(sec(899).shot.at).toBe("square");
+    expect(sec(901).shot.at).toBe("to");
+    expect(sec(1200).done).toBe(true);
+  });
+
+  it("is fastest at both cuts, slower over the square, at rest at both ends", () => {
+    expect(sec(0).pace).toBe(0);
+    expect(sec(300).pace).toBeCloseTo(1, 2);
+    expect(sec(600).pace).toBeCloseTo(defaultDoor.midPace, 6);
+    expect(sec(900).pace).toBeCloseTo(1, 2);
+    expect(sec(1200).pace).toBe(0);
+  });
+
+  it("leaves the first room the way out does, and lands in the second the way in does", () => {
+    const first = sec(0).shot;
+    const last = sec(1200).shot;
+    expect(first).toEqual({ at: "from", j: 1 });
+    expect(last).toEqual({ at: "to", j: 1 });
+    const out = sec(299.9).shot;
+    const into = sec(900.1).shot;
+    expect(out.at === "from" && roomZoom(out.j)).toBeCloseTo(1, 2);
+    expect(into.at === "to" && roomZoom(into.j)).toBeCloseTo(1, 2);
+  });
+
+  it("pulls back to zMid halfway, from the cut's magnification at both doors", () => {
+    expect(crossZoom(0)).toBeCloseTo(defaultDoor.zCut, 6);
+    expect(crossZoom(0.5)).toBeCloseTo(defaultDoor.zMid, 6);
+    expect(crossZoom(1)).toBeCloseTo(defaultDoor.zCut, 6);
+  });
+
+  it("matches the push-in on each door at the cuts, so neither cut moves the square", () => {
+    const start = crossSquareWindow(desktop, base, "barn", "haunt", 0);
+    const intoBarn = shiftWindow(base, doorShift(desktop, base, "barn", 0.5));
+    expect(start.scale).toBeCloseTo(intoBarn.scale, 6);
+    expect(start.origin.x).toBeCloseTo(intoBarn.origin.x, 4);
+    const end = crossSquareWindow(desktop, base, "barn", "haunt", 1);
+    const intoShop = shiftWindow(base, doorShift(desktop, base, "haunt", 0.5));
+    expect(end.origin.x).toBeCloseTo(intoShop.origin.x, 4);
+    expect(end.origin.y).toBeCloseTo(intoShop.origin.y, 4);
+  });
+
+  it("goes the way the doors lie: barn to haunt shop passes the café halfway", () => {
+    expect(crossPoint("barn", "haunt", 0.5).x).toBeCloseTo((DOORS.barn.x + DOORS.haunt.x) / 2, 6);
+    const field = crossField(desktop, base, "barn", "haunt", 0.5);
+    // The square slides left on screen as the camera travels right.
+    expect(field.b.x + field.k * desktop.width / 2).toBeLessThan(0);
+  });
+
+  it("matches the square's light to the room it is cutting from or to", () => {
+    expect(crossExposure(0)).toEqual({ mix: 1, room: "from" });
+    expect(crossExposure(0.5).mix).toBe(0);
+    expect(crossExposure(1)).toEqual({ mix: 1, room: "to" });
   });
 });

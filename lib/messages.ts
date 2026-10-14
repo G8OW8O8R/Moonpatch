@@ -46,6 +46,8 @@ export const messagesSchema = z.strictObject({
   }),
   rooms: z.strictObject({
     back: text,
+    nextDoor: text,
+    swipe: text,
     cafe: room,
     barn: room,
     haunt: room,

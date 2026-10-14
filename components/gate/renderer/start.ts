@@ -29,6 +29,7 @@ export interface GateController {
   setPlace(place: ScenePlace): void;
   setDoor(params: DoorParams): void;
   setPointer(at: { x: number; y: number } | null): void;
+  setLook(look: number): void;
   seek(at: DoorSeek | null): void;
   resize(css: Size): void;
   setActive(active: boolean): void;
@@ -73,7 +74,13 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
     else callbacks.onStats(message.stats);
   };
   worker.onerror = () => callbacks.onFail("worker failed");
-  const offscreen = canvas.transferControlToOffscreen();
+  let offscreen: OffscreenCanvas;
+  try {
+    offscreen = canvas.transferControlToOffscreen();
+  } catch (error) {
+    worker.terminate();
+    throw error;
+  }
   send({ type: "init", canvas: offscreen, setup }, [offscreen]);
   return {
     setProgress: (progress) => send({ type: "progress", progress }),
@@ -84,6 +91,7 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
     setPlace: (place) => send({ type: "place", place }),
     setDoor: (params) => send({ type: "door", params }),
     setPointer: (at) => send({ type: "pointer", at }),
+    setLook: (look) => send({ type: "look", look }),
     seek: (at) => send({ type: "seek", at }),
     resize: (css, dpr) => send({ type: "resize", css, dpr }),
     setActive: (active) => send({ type: "active", active }),
@@ -98,7 +106,7 @@ function workerEngine(canvas: HTMLCanvasElement, setup: EngineSetup, callbacks: 
 export function startGate(
   canvas: HTMLCanvasElement,
   poster: HTMLImageElement,
-  initial: { css: Size; params: RigParams; door: DoorParams; progress: number; square: SquareState; debugLayer?: "gate" | "plate" },
+  initial: { css: Size; params: RigParams; door: DoorParams; progress: number; square: SquareState; place: ScenePlace; debugLayer?: "gate" | "plate" },
   callbacks: GateCallbacks,
 ): GateController {
   let css = initial.css;
@@ -150,10 +158,18 @@ export function startGate(
         door: initial.door,
         progress: initial.progress,
         square: latestSquare,
+        place: initial.place,
         ...(initial.debugLayer ? { debugLayer: initial.debugLayer } : {}),
       };
       const offscreen = "transferControlToOffscreen" in canvas && typeof Worker !== "undefined";
-      engine = offscreen ? workerEngine(canvas, setup, events) : runGate(canvas, setup, events);
+      try {
+        engine = offscreen ? workerEngine(canvas, setup, events) : runGate(canvas, setup, events);
+      } catch (error) {
+        if (!offscreen) throw error;
+        // A canvas whose control has already gone (a module reloaded in development): start again on a fresh one.
+        callbacks.onPlateChange();
+        return;
+      }
       for (const task of pending) task(engine);
       pending = [];
     });
@@ -170,6 +186,7 @@ export function startGate(
     setPlace: (place) => withEngine((e) => e.setPlace(place)),
     setDoor: (params) => withEngine((e) => e.setDoor(params)),
     setPointer: (at) => engine?.setPointer(at),
+    setLook: (look) => engine?.setLook(look),
     seek: (at) => withEngine((e) => e.seek(at)),
     resize(next) {
       css = next;

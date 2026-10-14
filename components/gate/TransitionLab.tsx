@@ -28,6 +28,10 @@ const controls: Control[] = [
   { key: "leafRate", label: "Leaves vs room", min: 1, max: 2.5, step: 0.05 },
   { key: "exposure", label: "Exposure match (s)", min: 0, max: 0.2, step: 0.01 },
   { key: "turn", label: "Turn-around (s)", min: 0.04, max: 0.3, step: 0.01 },
+  { key: "crossDuration", label: "Room to room (s)", min: 0.6, max: 2.4, step: 0.05 },
+  { key: "crossCut", label: "Room to room: each room's share", min: 0.1, max: 0.4, step: 0.01 },
+  { key: "zMid", label: "Room to room: zoom halfway", min: 1, max: 2.6, step: 0.05 },
+  { key: "midPace", label: "Room to room: pace halfway", min: 0.2, max: 1, step: 0.05 },
 ];
 
 const format = (n: number) => (Math.abs(n) >= 10 ? n.toFixed(0) : n.toFixed(3));
@@ -41,7 +45,7 @@ const percentile = (xs: number[], p: number) => {
 declare global {
   interface Window {
     /** Development only: hold the move into a building at a moment (ms), or let it go (null). */
-    holdDoor?: (at: { room?: RoomId; leg: 1 | -1; ms: number } | null) => void;
+    holdDoor?: (at: { room?: RoomId; leg?: 1 | -1; ms: number; to?: RoomId } | null) => void;
   }
 }
 
@@ -50,20 +54,26 @@ export function TransitionLab({ children, square }: { children: ReactNode; squar
   const [door, setDoor] = useState<DoorParams>(defaultDoor);
   const [leg, setLeg] = useState<1 | -1>(1);
   const [room, setRoom] = useState<RoomId>("cafe");
+  /** Held straight on from `room` into another building. */
+  const [to, setTo] = useState<RoomId | null>(null);
   const [ms, setMs] = useState(0);
   const [held, setHeld] = useState(false);
   const [state, setState] = useState<GateDebugState | null>(null);
   const [journey, setJourney] = useState<number[]>([]);
   const onDebug = useCallback((next: GateDebugState) => setState(next), []);
-  const total = door.duration * 1000;
+  const total = (to ? door.crossDuration : door.duration) * 1000;
 
-  const seek = useMemo<DoorSeek | null>(() => (held ? { room, leg, ms: Math.min(ms, total) } : null), [held, room, leg, ms, total]);
+  const seek = useMemo<DoorSeek | null>(
+    () => (held ? { room, leg, ms: Math.min(ms, total), ...(to ? { to } : {}) } : null),
+    [held, room, leg, ms, total, to],
+  );
 
   useEffect(() => {
     window.holdDoor = (at) => {
       if (!at) return setHeld(false);
-      setLeg(at.leg);
+      setLeg(at.leg ?? 1);
       setRoom(at.room ?? "cafe");
+      setTo(at.to ?? null);
       setMs(at.ms);
       setHeld(true);
     };
@@ -72,7 +82,7 @@ export function TransitionLab({ children, square }: { children: ReactNode; squar
     };
   }, []);
 
-  const cutMs = cutTime(door) * total;
+  const cutMs = (to ? door.crossCut : cutTime(door)) * total;
 
   return (
     <>
@@ -84,7 +94,7 @@ export function TransitionLab({ children, square }: { children: ReactNode; squar
           {state ? `${state.mode}${state.reason ? ` (${state.reason})` : ""} · ${state.stats.fps.toFixed(0)} fps · q${state.stats.quality}` : "…"}
         </p>
         <div className="mb-3 flex gap-3">
-          <a href={placePath(square.lang, "cafe")} onClick={(e) => (e.preventDefault(), window.history.pushState(null, "", placePath(square.lang, "cafe")))} className="underline underline-offset-2">
+          <a href={placePath(square.lang, room)} onClick={(e) => (e.preventDefault(), window.history.pushState({ from: "square" }, "", placePath(square.lang, room)))} className="underline underline-offset-2">
             Enter
           </a>
           <button type="button" onClick={() => window.history.back()} className="underline underline-offset-2">
@@ -100,6 +110,15 @@ export function TransitionLab({ children, square }: { children: ReactNode; squar
             <label key={id} className="flex items-center gap-1">
               <input type="radio" name="room" checked={room === id} onChange={() => setRoom(id)} className="accent-pumpkin" />
               <span>{square.t.arms[id]}</span>
+            </label>
+          ))}
+        </div>
+        <div className="mb-2 flex flex-wrap gap-3">
+          <span>Straight on to</span>
+          {([null, ...ROOM_IDS] as const).map((id) => (
+            <label key={id ?? "none"} className="flex items-center gap-1">
+              <input type="radio" name="to" checked={to === id} onChange={() => setTo(id)} className="accent-pumpkin" />
+              <span>{id ? square.t.arms[id] : "—"}</span>
             </label>
           ))}
         </div>

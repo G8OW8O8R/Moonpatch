@@ -1,11 +1,13 @@
 /**
  * Inside a building: the room plate with its door leaves lifted off it. On
- * the way in the leaves slide past faster than the room (they are nearer),
- * and on a screen with a mouse the room drifts a little with the pointer,
- * the leaves more. At rest, and still, it draws the plate's own file
- * instead, the very picture the page shows.
+ * the way in the leaves slide past faster than the room (they are nearer);
+ * on a screen with a mouse the room drifts a little with the pointer, the
+ * leaves more, and on a narrow screen the leaves run a little ahead as the
+ * room is panned. At rest, and still, it draws the plate's own file instead,
+ * the very picture the page shows.
  */
 import { type DoorParams, defaultDoor, leafWindow, roomWindow } from "@/lib/door-rig";
+import { leafPanShift } from "@/lib/room-pan";
 import type { PlateWindow } from "@/lib/gate-rig";
 import { PLATE, type Size } from "@/lib/plate-box";
 import { ROOMS, type RoomId, type RoomLayer, edgeMid, leafSpan } from "@/lib/rooms";
@@ -66,9 +68,11 @@ void main() {
 const leafFragment = /* glsl */ `${header}
 in vec2 vUv;
 uniform sampler2D uTexture;
+uniform vec3 uBalance;   // gains on the premultiplied colour
 out vec4 outColour;
 void main() {
-  outColour = texture(uTexture, vUv);
+  vec4 colour = texture(uTexture, vUv);
+  outColour = vec4(colour.rgb * uBalance, colour.a);
 }
 `;
 
@@ -77,6 +81,11 @@ export interface RoomFrame {
   j: number;
   /** Followed pointer, -1…1 across the screen (0 in the middle, or with no mouse). */
   drift: { x: number; y: number };
+  /** Share of the plate's width at the middle of the screen, and where the room's look started. */
+  look?: number;
+  lookStart?: number;
+  /** How much of the room's leaf balance applies (0–1). */
+  balance?: number;
   params?: DoorParams;
   /** A frame buffer of the canvas's size to draw into instead of the canvas. */
   into?: WebGLFramebuffer | null;
@@ -151,12 +160,17 @@ export class RoomRenderer {
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.disable(gl.BLEND);
 
-    const room0 = roomWindow(css, frame.j, params);
-    const rest = roomWindow(css, 1, params);
+    const look = frame.look ?? 0.5;
+    const lookStart = frame.lookStart ?? look;
+    const room0 = roomWindow(css, frame.j, params, look);
+    const rest = roomWindow(css, 1, params, look);
     const { x: dx, y: dy } = frame.drift;
     // Pointing right looks right: the room slides the other way, the nearer leaves further.
     const plateWindow = moved(room0, -dx * DRIFT.plate, -dy * DRIFT.plate * 0.5);
-    const still = frame.j >= 1 && Math.abs(dx) * DRIFT.leaf < 0.01 && Math.abs(dy) * DRIFT.leaf < 0.01;
+    const panned = Math.abs(look - lookStart) > 1e-6;
+    const still = frame.j >= 1 && !panned && Math.abs(dx) * DRIFT.leaf < 0.01 && Math.abs(dy) * DRIFT.leaf < 0.01;
+    const gains = ROOMS[room].balance ?? [1, 1, 1];
+    const b = frame.balance ?? 0;
 
     if (still && textures.plate) {
       this.drawPlate(textures.plate, room0, dpr, canvas);
@@ -170,8 +184,10 @@ export class RoomRenderer {
     gl.uniform2f(p.uniform("uViewport"), canvas.width, canvas.height);
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(p.uniform("uTexture"), 0);
+    gl.uniform3f(p.uniform("uBalance"), 1 + (gains[0] - 1) * b, 1 + (gains[1] - 1) * b, 1 + (gains[2] - 1) * b);
     for (const { layer, texture } of textures.leaves) {
-      const w = moved(leafWindow(css, room0, rest, edgeMid(layer), layer.side, params), -dx * DRIFT.leaf, -dy * DRIFT.leaf * 0.5);
+      const ahead = panned ? leafPanShift(css, look, lookStart, layer.nearness) : 0;
+      const w = moved(leafWindow(css, room0, rest, edgeMid(layer), layer.side, params), ahead - dx * DRIFT.leaf, -dy * DRIFT.leaf * 0.5);
       const { left, width } = leafSpan(layer);
       const at = (x: number, y: number, u: number, v: number): Corner => ({
         x: (w.origin.x + w.scale * x) * dpr,

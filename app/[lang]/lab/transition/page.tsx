@@ -4,7 +4,7 @@ import { GatePoster } from "@/components/gate/GatePoster";
 import { TransitionLab } from "@/components/gate/TransitionLab";
 import { isLocale } from "@/lib/i18n";
 import { getMessages } from "@/lib/messages";
-import { visitCopy } from "@/lib/visit";
+import { sceneCopy } from "@/components/gate/scene-copy";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
@@ -13,11 +13,11 @@ export default async function TransitionLabPage({ params }: { params: Promise<{ 
   if (process.env.NODE_ENV === "production") notFound();
   const { lang } = await params;
   if (!isLocale(lang)) notFound();
-  const { gate, square, visit, rooms } = getMessages(lang);
+  const { gate } = getMessages(lang);
 
   return (
     <main>
-      <TransitionLab square={{ lang, t: square, visit, board: visitCopy(lang), rooms }}>
+      <TransitionLab square={sceneCopy(lang)}>
         <GatePoster alt={gate.posterAlt} />
         <div className="sr-only">
           <h1 id="gate-heading">{gate.heading}</h1>

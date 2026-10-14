@@ -3,5 +3,6 @@
   "layers": [
     { "id": "door-left", "side": "left", "edge": [[0.12613, 0], [0.12663, 1]], "nearness": 1.15 },
     { "id": "door-right", "side": "right", "edge": [[0.88843, 0], [0.89197, 1]], "nearness": 1.15 }
-  ]
+  ],
+  "balance": [1.076, 0.798, 0.729]
 }

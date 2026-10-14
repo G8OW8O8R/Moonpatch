@@ -2,18 +2,20 @@
 
 import "lenis/dist/lenis.css";
 import { usePathname } from "next/navigation";
-import { type MouseEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type MouseEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { RoomPlate, RoomUi } from "@/components/room/RoomView";
 import { type DoorParams, defaultDoor } from "@/lib/door-rig";
 import { type RigParams, defaultRig } from "@/lib/gate-rig";
 import type { Locale } from "@/lib/i18n";
 import type { Messages } from "@/lib/messages";
-import { type RoomId, isRoomId } from "@/lib/rooms";
+import { ROOM_REST_ZOOM, roomBox } from "@/lib/plate-box";
+import { type Pan, dragLook, flickVelocity, glide, pans } from "@/lib/room-pan";
+import { ROOMS, type RoomId, isRoomId } from "@/lib/rooms";
 import { placeAt, placePath } from "@/lib/routes";
 import { type ArmId, propsOnScreen } from "@/lib/square-props";
 import { DUSK, type Track, defaultTrack, trackAt, trackEnd, trackLength } from "@/lib/square-rig";
 import { SPOT_KEY, readSpot, spotToKeep, startAt, writeSpot } from "@/lib/square-spot";
 import type { VisitCopy } from "@/lib/visit";
-import { Icon } from "@/components/ui/Icon";
 import { publishLenis } from "@/components/ui/lenis-channel";
 import { SquareDriver } from "@/components/square/driver";
 import { drawArmLabels } from "@/components/square/labels";
@@ -41,6 +43,8 @@ export interface SquareCopy {
   visit: Messages["visit"];
   board: VisitCopy;
   rooms: Messages["rooms"];
+  /** Page titles of the places the scene moves to by itself. */
+  titles: Record<"square" | RoomId, string>;
 }
 
 export interface GateSceneProps {
@@ -48,8 +52,8 @@ export interface GateSceneProps {
   children: ReactNode;
   labelledBy: string;
   square: SquareCopy;
-  /** Open on the notice board (its own address) instead of at the gate. */
-  initialView?: "gate" | "visit";
+  /** Open on the notice board or inside a building (their own addresses) instead of at the gate. */
+  initialView?: "gate" | "visit" | RoomId;
   /** Lengths of the scroll, in viewport heights. */
   track?: Track;
   params?: RigParams;
@@ -134,6 +138,40 @@ const isReturning = () => {
   return sceneLeft || documentPath !== window.location.pathname;
 };
 
+/** Where the address the visitor is on was pushed from, if it was the scene that pushed it. */
+const cameFrom = (): unknown => {
+  const state: unknown = window.history.state;
+  return state && typeof state === "object" && "from" in state ? (state as { from: unknown }).from : undefined;
+};
+
+/** A plain click, the kind the scene may take over from a link. */
+const plainClick = (event: MouseEvent) => event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+
+/** The hint about looking around goes for the rest of the visit once the visitor has done it. */
+const SWIPED_KEY = "moonpatch:swiped";
+
+const swiped = () => {
+  try {
+    return window.sessionStorage.getItem(SWIPED_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+
+/** Screens that look around a room by touch: the room runs well past their sides. */
+const NARROW_TOUCH = "(pointer: coarse) and (aspect-ratio < 1.55)";
+const isNarrowTouch = () => window.matchMedia(NARROW_TOUCH).matches;
+const watchNarrowTouch = (onChange: () => void) => {
+  const query = window.matchMedia(NARROW_TOUCH);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+};
+const watchNothing = () => () => undefined;
+const never = () => false;
+
+/** The stage's size, CSS px. */
+const sizeOf = (el: HTMLElement | null) => (el ? { width: el.clientWidth, height: el.clientHeight } : { width: window.innerWidth, height: window.innerHeight });
+
 const storedSpot = () => {
   try {
     return readSpot(window.sessionStorage.getItem(SPOT_KEY));
@@ -178,7 +216,9 @@ export function GateScene({
    * The page started on the square: it is simply there, a cut, with no fade
    * over the gate poster beneath. Lasts until the visitor first scrolls.
    */
-  const [cut, setCut] = useState(initialView === "visit");
+  const [cut, setCut] = useState(initialView !== "gate");
+  /** Opened on a building's own address: the scene starts inside it. */
+  const startRoom = isRoomId(initialView) ? initialView : null;
   /** The scene has its first frame; it is shown once it can draw the square, if that is where the page is. */
   const engineReady = useRef(false);
   const paramsRef = useRef(params);
@@ -188,16 +228,39 @@ export function GateScene({
    * The building the camera has come to rest in (its copy is shown), and the one it is in from the
    * cut on. Nothing React renders changes while a move plays: the page only touches the DOM then.
    */
-  const [inside, setInside] = useState<RoomId | null>(null);
-  const insideRef = useRef<RoomId | null>(null);
+  const [inside, setInside] = useState<RoomId | null>(startRoom);
+  const insideRef = useRef<RoomId | null>(startRoom);
+  /** The building the page last came to rest in (the cut moves `insideRef` on before the page follows). */
+  const restedIn = useRef<RoomId | null>(startRoom);
   /** On the way into a building, inside it, or on the way out: the square's own layer stands aside. */
-  const awayRef = useRef(false);
+  const awayRef = useRef(!!startRoom);
+  /** Where the page is, or is on its way to. */
+  const placeRef = useRef<ScenePlace>(startRoom ?? "square");
+  /** Where the scene has come to rest (null: not yet, when it starts inside a building). */
+  const canvasPlace = useRef<ScenePlace | null>(startRoom ? null : "square");
+  /** Opened inside a building, the square's own pictures wait until the scene starts or the visitor leaves. */
+  const [squareWarm, setSquareWarm] = useState(!startRoom);
+  /** The page has come to rest somewhere other than where it opened: a room seen from now on fades in. */
+  const [settledInPage, setSettledInPage] = useState(false);
+  const roomPlate = useRef<HTMLDivElement>(null);
+  const roomHeading = useRef<HTMLHeadingElement>(null);
+  /** What takes the focus once the page has caught up with a move: the room's name, or the arm of the building left. */
+  const focusNext = useRef<"room" | RoomId | null>(null);
+  /** Looking around a room on a narrow screen. */
+  const pan = useRef<Pan>({ look: startRoom ? ROOMS[startRoom].look : 0.5, velocity: 0 });
+  const lookStart = useRef(startRoom ? ROOMS[startRoom].look : 0.5);
+  const drag = useRef<{ id: number; x: number; t: number; v: number; moved: number } | null>(null);
+  const glideFrame = useRef(0);
+  /** The hint about looking around: narrow touch screens, until the visitor has done it once. */
+  const narrowTouch = useSyncExternalStore(watchNarrowTouch, isNarrowTouch, never);
+  const swipedBefore = useSyncExternalStore(watchNothing, swiped, never);
+  const [swipedHere, setSwipedHere] = useState(false);
+  const swipeNoted = useRef(false);
+  const hint = !!inside && narrowTouch && !swipedBefore && !swipedHere;
   /** A move to or from a building is playing: nothing may render on the page until it lands. */
   const moving = useRef(false);
   const squareLayer = useRef<HTMLDivElement>(null);
   const roomLayer = useRef<HTMLDivElement>(null);
-  /** The building was entered from the square in this visit, so the way out is the browser's way back. */
-  const roomFromHere = useRef(false);
   const trackRef = useRef(track);
   const [mode, setMode] = useState<Mode>("poster");
   const [reason, setReason] = useState("");
@@ -241,12 +304,15 @@ export function GateScene({
   const room = isRoomId(here) && ROOMS_IN_SCENE.has(here) ? here : null;
   const boardOpenRef = useRef(boardOpen);
 
+  /** Over the opened board and inside a building the page holds still. */
+  const heldStill = useCallback(() => boardOpenRef.current || placeRef.current !== "square", []);
+
   // While the timed ride plays, the page holds still inside the section; it lets go when the ride lands.
   const release = useCallback(() => {
     window.clearTimeout(holdTimer.current);
     holdTimer.current = 0;
-    if (!boardOpenRef.current) lenis.current?.start();
-  }, []);
+    if (!heldStill()) lenis.current?.start();
+  }, [heldStill]);
   const hold = useCallback(() => {
     lenis.current?.stop();
     window.clearTimeout(holdTimer.current);
@@ -271,6 +337,8 @@ export function GateScene({
     const webgl = modeRef.current === "webgl";
     const onSquare = webgl ? rideAt.current === 1 && rideWanted.current === 1 && squareReady.current : progress.current >= 0.5;
     d.showProps(onSquare || boardOpenRef.current, jump);
+    // Inside a building the square's own pictures wait: the room comes first, the scene readies them later.
+    if (placeRef.current !== "square") return;
     // The scene paints the opened board itself; only the plain-HTML square needs its image.
     if (onSquare && !webgl && !boardImage.current) {
       const img = openedBoardPicture();
@@ -293,8 +361,11 @@ export function GateScene({
 
   const showCanvas = useCallback(() => {
     if (!engineReady.current || modeRef.current === "webgl") return;
+    const place = placeRef.current;
+    // Inside, the canvas waits until it shows the room at rest; until then the room's picture stands.
+    if (place !== "square" && canvasPlace.current !== place) return;
     // On the square, the canvas waits for the square's own layers; until then the plain one stands.
-    if (rideWanted.current === 1 && !squareReady.current) return;
+    if (place === "square" && rideWanted.current === 1 && !squareReady.current) return;
     setMode("webgl");
     setReason("");
   }, []);
@@ -381,7 +452,7 @@ export function GateScene({
         if (cancelled) return;
         const instance = new Lenis({ autoRaf: true, smoothWheel: true, syncTouch: false });
         lenis.current = instance;
-        if (boardOpenRef.current) instance.stop();
+        if (heldStill()) instance.stop();
         publishLenis(instance);
       });
     }
@@ -397,7 +468,7 @@ export function GateScene({
       window.removeEventListener("scroll", measure);
       window.removeEventListener("resize", measure);
     };
-  }, [measure]);
+  }, [measure, heldStill]);
 
   // Where the page starts is decided here, never by the browser: a reload or a fresh visit starts on
   // the closed gate (the poster's own frame); the way back from a building lands on the spot the
@@ -411,7 +482,7 @@ export function GateScene({
     }
     if (startedAt.current === null) {
       const square = window.location.hash === "#square";
-      startedAt.current = startAt({ board: initialView === "visit", square, returning: isReturning(), spot: storedSpot() }, trackRef.current);
+      startedAt.current = startAt({ board: initialView !== "gate", square, returning: isReturning(), spot: storedSpot() }, trackRef.current);
       // #square only says where to start: a reload of the address is a fresh visit.
       if (square) window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
     }
@@ -430,6 +501,8 @@ export function GateScene({
     // The header and the square's layer are set in this very commit: no frame shows the server's gate state.
     driver.current?.draw();
     setCut(true);
+    // Inside a building nothing scrolls.
+    if (placeRef.current !== "square") document.documentElement.style.overflow = "hidden";
   }, [initialView, measure, syncProps]);
 
   // The spot on the square is kept for the way back, as the scene leaves the page or the tab.
@@ -472,9 +545,9 @@ export function GateScene({
       lenis.current?.stop();
     } else {
       d.openBoard(false);
-      if (!holdTimer.current) lenis.current?.start();
+      if (!holdTimer.current && !heldStill()) lenis.current?.start();
     }
-  }, [boardOpen, measure, syncProps]);
+  }, [boardOpen, measure, syncProps, heldStill]);
 
   const openBoard = useCallback(() => {
     openedHere.current = true;
@@ -501,67 +574,45 @@ export function GateScene({
     else el.dataset.away = "";
   }, []);
 
-  /** The room's own copy, hidden the moment the way out begins. */
+  /** The room's own copy (and its picture), hidden the moment the way out begins. */
   const showRoomLayer = useCallback((shown: boolean) => {
-    const el = roomLayer.current;
-    if (!el) return;
-    el.inert = !shown;
-    el.style.opacity = shown ? "" : "0";
-  }, []);
-
-  /** Starts a move. The address follows once it has landed, so no render of the page falls inside it. */
-  const goTo = useCallback(
-    (place: ScenePlace) => {
-      const c = controller.current;
-      if (!c) return;
-      if (place === "square") showRoomLayer(false);
-      else if (!awayRef.current) {
-        showSquareLayer(false);
-        lenis.current?.stop();
-      }
-      moving.current = true;
-      c.setPlace(place);
-    },
-    [showRoomLayer, showSquareLayer],
-  );
-
-  // The browser's back and forward (and any other change of address) move the camera too.
-  useEffect(() => {
-    if (room) {
-      if (modeRef.current === "webgl") goTo(room);
-    } else if (awayRef.current) {
-      goTo("square");
+    for (const el of [roomLayer.current, roomPlate.current]) {
+      if (!el) continue;
+      el.inert = !shown;
+      el.style.opacity = shown ? "" : "0";
     }
-  }, [room, goTo]);
-
-  /** The camera has cut across: only the header follows it now, the rest once it has landed. */
-  const cutTo = useCallback((place: ScenePlace) => {
-    const next = place === "square" ? null : place;
-    insideRef.current = next;
-    if (next && section.current) section.current.dataset.header = "paper";
-    else driver.current?.refresh();
   }, []);
 
   /**
-   * A move has landed. Inside, the square waits under the room at the end of its path; outside, the
-   * page scrolls again. Only now does the address change, and the page render with it.
+   * The page catches up with where the camera now is: inside, the square waits under the room at the
+   * end of its path and nothing scrolls; outside, the page scrolls again. The address, the title and
+   * the focus follow.
    */
-  const placed = useCallback(
+  const settle = useCallback(
     (place: ScenePlace) => {
-      moving.current = false;
-      reportStats(latestStats.current);
       const html = document.documentElement;
       const at = placeAt(window.location.pathname)?.place;
+      const left = restedIn.current;
+      restedIn.current = place === "square" ? null : place;
+      setSettledInPage(true);
       if (place === "square") {
+        insideRef.current = null;
+        if (section.current) delete section.current.dataset.inside;
         showSquareLayer(true);
         html.style.overflow = "";
         if (!boardOpenRef.current) lenis.current?.start();
         setInside(null);
+        setSquareWarm(true);
+        // The square's pictures, held back while the page opened inside a building.
+        syncProps();
+        driver.current?.refresh();
         if (isRoomId(at)) {
-          if (roomFromHere.current) window.history.back();
+          // Came in from the square on this page: the way out is the browser's way back.
+          if (cameFrom() === "square") window.history.back();
           else window.history.pushState(null, "", placePath(square.lang, "square"));
         }
-        roomFromHere.current = false;
+        document.title = square.titles.square;
+        focusNext.current = left;
         return;
       }
       const el = section.current;
@@ -570,23 +621,120 @@ export function GateScene({
       measure();
       driver.current?.follow(1, 1, true);
       html.style.overflow = "hidden";
+      lenis.current?.stop();
+      insideRef.current = place;
+      if (el) {
+        el.dataset.inside = "";
+        el.dataset.header = "paper";
+      }
       showRoomLayer(true);
       setInside(place);
-      if (at !== place) {
-        roomFromHere.current = true;
-        window.history.pushState(null, "", placePath(square.lang, place));
-      }
+      if (at !== place) window.history.pushState({ from: at ?? "square" }, "", placePath(square.lang, place));
+      document.title = square.titles[place];
+      if (left !== place) focusNext.current = "room";
     },
-    [measure, reportStats, showRoomLayer, showSquareLayer, square.lang],
+    [measure, showRoomLayer, showSquareLayer, square.lang, square.titles, syncProps],
+  );
+
+  /**
+   * Goes to a place. With the scene on screen the camera flies there and the page follows once it has
+   * landed, so no render of the page falls inside the move; without it the page crossfades, and a
+   * scene still loading follows out of sight.
+   */
+  const goTo = useCallback(
+    (place: ScenePlace) => {
+      if (place === placeRef.current) return;
+      placeRef.current = place;
+      cancelAnimationFrame(glideFrame.current);
+      drag.current = null;
+      const c = controller.current;
+      if (modeRef.current === "webgl" && c) {
+        showRoomLayer(false);
+        if (place !== "square" && !awayRef.current) {
+          showSquareLayer(false);
+          lenis.current?.stop();
+        }
+        // A screen above 2× shows the canvas from the first move on; this is one.
+        canvas.current?.classList.remove("invisible");
+        moving.current = true;
+        c.setPlace(place);
+        return;
+      }
+      c?.setPlace(place);
+      if (place !== "square") {
+        if (!awayRef.current) showSquareLayer(false);
+        settle(place);
+        return;
+      }
+      showRoomLayer(false);
+      window.setTimeout(() => {
+        if (placeRef.current === "square") settle("square");
+      }, 150);
+    },
+    [settle, showRoomLayer, showSquareLayer],
+  );
+
+  // The browser's back and forward (and any other change of address) move the camera too, once
+  // the address has been taken in.
+  useEffect(() => {
+    if (boardOpen) return;
+    const place = room ?? "square";
+    queueMicrotask(() => goTo(place));
+  }, [room, boardOpen, goTo]);
+
+  /** The camera has cut across: only the header follows it now, the rest once it has landed. */
+  const cutTo = useCallback((place: ScenePlace) => {
+    const next = place === "square" ? null : place;
+    insideRef.current = next;
+    const el = section.current;
+    if (next && el) {
+      el.dataset.header = "paper";
+      el.dataset.inside = "";
+    } else {
+      if (el) delete el.dataset.inside;
+      driver.current?.refresh();
+    }
+  }, []);
+
+  /** A move has come to rest. On the page's own way there, the page follows; out of sight, the canvas may now be shown. */
+  const placed = useCallback(
+    (place: ScenePlace) => {
+      canvasPlace.current = place;
+      if (modeRef.current !== "webgl") {
+        showCanvas();
+        return;
+      }
+      // Landed on the way somewhere else: the scene goes on by itself.
+      if (place !== placeRef.current) return;
+      moving.current = false;
+      reportStats(latestStats.current);
+      settle(place);
+    },
+    [reportStats, settle, showCanvas],
   );
 
   useEffect(() => () => void (document.documentElement.style.overflow = ""), []);
 
+  // Arriving, the room's name takes the focus; back on the square, the arm of the building just left.
+  useEffect(() => {
+    const target = focusNext.current;
+    if (!target) return;
+    focusNext.current = null;
+    if (target === "room") roomHeading.current?.focus({ preventScroll: true });
+    else squareLayer.current?.querySelector<HTMLElement>(`a[href="${placePath(square.lang, target)}"]`)?.focus({ preventScroll: true });
+  }, [inside, square.lang]);
+
+  // Each room is first seen where it looks first.
+  useEffect(() => {
+    cancelAnimationFrame(glideFrame.current);
+    if (!inside) return;
+    pan.current = { look: ROOMS[inside].look, velocity: 0 };
+    lookStart.current = pan.current.look;
+  }, [inside]);
+
   const enterRoom = useCallback(
     (arm: ArmId, event: MouseEvent<HTMLAnchorElement>) => {
-      // The scene takes the visitor in itself only from the drawn square; otherwise the link opens the room's page.
-      if (!ROOMS_IN_SCENE.has(arm) || modeRef.current !== "webgl" || rideAt.current !== 1 || !squareReady.current) return;
-      if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (!ROOMS_IN_SCENE.has(arm) || !plainClick(event)) return;
       event.preventDefault();
       goTo(arm);
     },
@@ -595,21 +743,101 @@ export function GateScene({
 
   const leaveRoom = useCallback(() => goTo("square"), [goTo]);
 
+  const onBack = useCallback(
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      if (!plainClick(event)) return;
+      event.preventDefault();
+      leaveRoom();
+    },
+    [leaveRoom],
+  );
+
+  const onNextDoor = useCallback(
+    (next: RoomId, event: MouseEvent<HTMLAnchorElement>) => {
+      if (!plainClick(event)) return;
+      event.preventDefault();
+      goTo(next);
+    },
+    [goTo],
+  );
+
   // Esc leaves a building, or turns the way in around before it lands.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && awayRef.current) leaveRoom();
+      if (event.key === "Escape" && !boardOpenRef.current && (awayRef.current || placeRef.current !== "square")) leaveRoom();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [leaveRoom]);
 
-  /** Inside, a mouse moves the room a little. */
-  const point = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType !== "mouse" || !insideRef.current) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    controller.current?.setPointer({ x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: ((event.clientY - rect.top) / rect.height) * 2 - 1 });
+  /** Looks somewhere else in the room: the scene, and the room's picture where it stands in for it. */
+  const lookAt = useCallback((look: number) => {
+    pan.current.look = look;
+    controller.current?.setLook(look);
+    const img = roomPlate.current?.querySelector("img");
+    if (img) {
+      const size = sizeOf(stage.current);
+      const by = roomBox(size, ROOM_REST_ZOOM, look).x - roomBox(size, ROOM_REST_ZOOM, lookStart.current).x;
+      img.style.transform = by ? `translate3d(${by}px, 0, 0)` : "";
+    }
   }, []);
+
+  /** A finger on a narrow screen pans the room; a flick carries on and slows to a stop. */
+  const touchDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse" || !insideRef.current || moving.current || placeRef.current === "square" || !pans(sizeOf(stage.current))) return;
+    if ((event.target as Element).closest("a, button")) return;
+    cancelAnimationFrame(glideFrame.current);
+    pan.current.velocity = 0;
+    drag.current = { id: event.pointerId, x: event.clientX, t: event.timeStamp, v: 0, moved: 0 };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, []);
+
+  const touchUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || d.id !== event.pointerId) return;
+    drag.current = null;
+    // A finger that stopped before lifting leaves the room where it is.
+    const v = event.timeStamp - d.t > 80 ? 0 : d.v;
+    const size = sizeOf(stage.current);
+    pan.current.velocity = flickVelocity(size, v);
+    if (pan.current.velocity === 0 || prefersReduced()) return;
+    let last = performance.now();
+    const step = (now: number) => {
+      pan.current = glide(size, pan.current, Math.min(0.05, (now - last) / 1000));
+      last = now;
+      lookAt(pan.current.look);
+      if (pan.current.velocity !== 0 && drag.current === null && !moving.current) glideFrame.current = requestAnimationFrame(step);
+    };
+    glideFrame.current = requestAnimationFrame(step);
+  }, [lookAt]);
+
+  /** Inside, a mouse moves the room a little; a finger looks around it. */
+  const point = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    if (!insideRef.current) return;
+    if (event.pointerType === "mouse") {
+      const rect = event.currentTarget.getBoundingClientRect();
+      controller.current?.setPointer({ x: ((event.clientX - rect.left) / rect.width) * 2 - 1, y: ((event.clientY - rect.top) / rect.height) * 2 - 1 });
+      return;
+    }
+    const d = drag.current;
+    if (!d || d.id !== event.pointerId) return;
+    const dx = event.clientX - d.x;
+    const dt = Math.max(1, event.timeStamp - d.t);
+    d.v = 0.8 * ((dx / dt) * 1000) + 0.2 * d.v;
+    d.x = event.clientX;
+    d.t = event.timeStamp;
+    d.moved += Math.abs(dx);
+    lookAt(dragLook(sizeOf(stage.current), pan.current.look, dx));
+    if (d.moved > 12 && !swipeNoted.current) {
+      swipeNoted.current = true;
+      setSwipedHere(true);
+      try {
+        window.sessionStorage.setItem(SWIPED_KEY, "1");
+      } catch {
+        // Without storage the hint may come back in the next room.
+      }
+    }
+  }, [lookAt]);
   const unpoint = useCallback(() => controller.current?.setPointer(null), []);
 
   useEffect(() => {
@@ -662,9 +890,14 @@ export function GateScene({
     });
 
     const onBoard = initialView === "visit" && boardOpenRef.current;
+    // Opened elsewhere than at the gate, the scene comes in a little after the page has settled.
+    const later = onBoard || startRoom !== null;
     const cancelStart = whenIdle(() => {
       if (cancelled) return;
-      if (onBoard) warmSquare(signpost.current);
+      if (later) {
+        warmSquare(signpost.current);
+        setSquareWarm(true);
+      }
       // Opened on the board, the gate's poster has waited until now; the scene starts from it.
       if (poster.loading === "lazy") poster.loading = "eager";
       void import("./renderer/start").then(({ startGate }) => {
@@ -685,6 +918,7 @@ export function GateScene({
             door: doorRef.current,
             progress: progress.current,
             square: driver.current?.snapshot() ?? restingSquare,
+            place: placeRef.current,
             ...debugLayer(),
           },
           {
@@ -697,6 +931,11 @@ export function GateScene({
               controller.current = null;
               setMode("fallback");
               setReason(why);
+              // A move cut short by the scene giving up lands at once.
+              if (moving.current) {
+                moving.current = false;
+                settle(placeRef.current);
+              }
             },
             onPlateChange: () => {
               engineReady.current = false;
@@ -735,7 +974,7 @@ export function GateScene({
         resize.observe(stageEl);
         document.addEventListener("visibilitychange", onVisibility);
       });
-    }, onBoard ? BOARD_SCENE_DELAY : 0);
+    }, later ? BOARD_SCENE_DELAY : 0);
 
     return () => {
       cancelled = true;
@@ -746,7 +985,7 @@ export function GateScene({
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang, initialView, cutTo, placed, reportStats]);
+  }, [restart, release, syncProps, showCanvas, square.t.arms, square.lang, initialView, startRoom, cutTo, placed, reportStats, settle]);
 
   // A fresh frame once the canvas is shown; without the scene nothing may hold the page.
   useEffect(() => {
@@ -778,7 +1017,8 @@ export function GateScene({
     <section
       ref={section}
       aria-labelledby={labelledBy}
-      data-header="ink"
+      data-header={initialView === "gate" ? "ink" : "paper"}
+      data-inside={startRoom ? "" : undefined}
       className="relative"
       style={{ height: `${trackLength(track) * 100}lvh` }}
     >
@@ -786,10 +1026,16 @@ export function GateScene({
         ref={stage}
         className="scene-stage sticky top-0 h-lvh overflow-hidden bg-bark"
         data-cut={cut ? "" : undefined}
+        data-hold-poster={squareWarm ? undefined : ""}
+        style={inside ? { touchAction: "pinch-zoom" } : undefined}
+        onPointerDown={touchDown}
         onPointerMove={point}
+        onPointerUp={touchUp}
+        onPointerCancel={touchUp}
         onPointerLeave={unpoint}
       >
         {children}
+        {inside && <RoomPlate key={`plate-${inside}`} ref={roomPlate} room={inside} alt={square.rooms[inside].alt} fade={settledInPage} />}
         <canvas
           key={restart}
           ref={canvas}
@@ -797,7 +1043,12 @@ export function GateScene({
           data-gate-canvas={mode}
           className={`absolute inset-0 size-full ${canvasShown ? "" : "invisible"}`}
         />
-        <div ref={squareLayer} className="absolute inset-0 transition-opacity duration-150 data-[away]:pointer-events-none data-[away]:opacity-0">
+        <div
+          ref={squareLayer}
+          inert={!!startRoom}
+          data-away={startRoom ? "" : undefined}
+          className="absolute inset-0 transition-opacity duration-150 data-[away]:pointer-events-none data-[away]:opacity-0"
+        >
         <div
           inert={!!seek}
           className={`absolute inset-0 ${cut ? "" : "transition-opacity duration-150"} ${!seek && (htmlSquare || mode === "webgl") ? "opacity-100" : "pointer-events-none opacity-0"}`}
@@ -807,7 +1058,7 @@ export function GateScene({
             lang={square.lang}
             t={square.t}
             paints={htmlSquare}
-            plates={!boardOpen || openedInPage}
+            plates={(!boardOpen || openedInPage) && squareWarm}
             first={cut}
             boardOpen={boardOpen}
             onPointArm={pointArm}
@@ -818,13 +1069,17 @@ export function GateScene({
         </div>
         </div>
         {inside && (
-          <div ref={roomLayer} className="absolute inset-0 transition-opacity duration-150">
-            <h1 className="sr-only">{square.rooms[inside].title}</h1>
-            <button type="button" onClick={leaveRoom} className="room-back transition-opacity duration-300 starting:opacity-0">
-              <Icon name="arrow-left" className="drop-shadow-hug" />
-              <span>{square.rooms.back}</span>
-            </button>
-          </div>
+          <RoomUi
+            key={`ui-${inside}`}
+            ref={roomLayer}
+            headingRef={roomHeading}
+            room={inside}
+            lang={square.lang}
+            t={square.rooms}
+            hint={hint}
+            onBack={onBack}
+            onNextDoor={onNextDoor}
+          />
         )}
         {boardOpen && <VisitBackdrop ref={backdrop} painted={canvasShown} />}
         {boardOpen && (

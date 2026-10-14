@@ -41,6 +41,8 @@
   },
   "rooms": {
     "back": "Wróć na plac",
+    "nextDoor": "Obok",
+    "swipe": "Przesuń, żeby się rozejrzeć",
     "cafe": {
       "title": "Kawiarnia",
       "description": "Pączki z cydrem, chlebek dyniowy i coś ciepłego do rąk, w kremowej kawiarni z szałwiowymi drzwiami.",

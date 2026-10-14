@@ -3,17 +3,19 @@ import type { Locale } from "@/lib/i18n";
 import { getMessages } from "@/lib/messages";
 import { SOFT_POSTER, openedBoardFile, openedBoardSrcSet } from "@/lib/square-poster";
 import { openedBoardSizes } from "@/lib/square-props";
-import { visitCopy } from "@/lib/visit";
+import type { RoomId } from "@/lib/rooms";
 import { GatePoster } from "./GatePoster";
 import { GateScene } from "./GateScene";
+import { sceneCopy } from "./scene-copy";
 
 /**
- * The gate, the ride and the square, as one server-rendered page. The Visit
- * address renders the same page opened on the notice board, so its copy is
- * in the HTML from the first byte.
+ * The gate, the ride, the square and the buildings, as one server-rendered
+ * page. The Visit address renders the same page opened on the notice board,
+ * and each building's address opens it inside that building, so what is seen
+ * first is in the HTML from the first byte.
  */
-export function FarmFront({ lang, initialView = "gate" }: { lang: Locale; initialView?: "gate" | "visit" }) {
-  const { gate, square, visit, rooms } = getMessages(lang);
+export function FarmFront({ lang, initialView = "gate" }: { lang: Locale; initialView?: "gate" | "visit" | RoomId }) {
+  const { gate, square } = getMessages(lang);
   // Opened on the board, the board is the first thing seen.
   if (initialView === "visit") {
     preload(openedBoardFile(1160, "avif"), {
@@ -32,7 +34,7 @@ export function FarmFront({ lang, initialView = "gate" }: { lang: Locale; initia
       <GateScene
         labelledBy="gate-heading"
         initialView={initialView}
-        square={{ lang, t: square, visit, board: visitCopy(lang), rooms }}
+        square={sceneCopy(lang)}
       >
         <GatePoster alt={gate.posterAlt} priority={initialView === "gate"} />
         <div className="sr-only">

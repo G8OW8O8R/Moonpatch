@@ -20,8 +20,10 @@ export function SiteHeader({ lang, t }: { lang: Locale; t: Messages["header"] })
 
   return (
     <header className="site-header pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-4 px-gutter pt-gutter">
+      {/* Not prefetched: the gate's page asks for its poster up front, which elsewhere would compete with what is on screen. */}
       <Link
         href={`/${lang}`}
+        prefetch={false}
         aria-label={t.home}
         className="wordmark-link pointer-events-auto block shrink-0 rounded-sm drop-shadow-hug"
       >

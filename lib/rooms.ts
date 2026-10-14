@@ -24,10 +24,17 @@ const layerSchema = z.strictObject({
   nearness: z.number().min(1).max(2),
 });
 
+const gain = z.number().min(0.5).max(1.5);
+
 export const roomSchema = z.strictObject({
   /** Where a panning camera first looks, as a share of the plate's width. */
   look: share,
   layers: z.array(layerSchema).max(2),
+  /**
+   * Gains on the leaves' red, green and blue at the cut, where the leaves are
+   * still seen in the square's light; they ease back to 1 as the room settles.
+   */
+  balance: z.tuple([gain, gain, gain]).optional(),
 });
 
 export type RoomLayer = z.infer<typeof layerSchema>;
@@ -38,6 +45,9 @@ export const ROOMS: Readonly<Record<RoomId, RoomContent>> = {
   barn: roomSchema.parse(barn),
   haunt: roomSchema.parse(haunt),
 };
+
+/** The buildings as they stand on the square, left to right. */
+export const ROOM_ROW: readonly RoomId[] = ["barn", "cafe", "haunt"];
 
 export const isRoomId = (value: unknown): value is RoomId => typeof value === "string" && (ROOM_IDS as readonly string[]).includes(value);
 
