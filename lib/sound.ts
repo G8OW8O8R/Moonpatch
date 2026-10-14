@@ -6,49 +6,29 @@
 import { z } from "zod";
 import type { RoomId } from "./rooms";
 
-/** A scene with its own bed of sound. */
+/** Where the visitor can stand, as far as sound goes. */
 export type SoundScene = "gate" | "square" | RoomId;
 
-export const SOUND_SCENES = ["gate", "square", "cafe", "barn", "haunt"] as const satisfies readonly SoundScene[];
+/** The scenes with a bed of sound of their own; the gate and the square are heard in silence. */
+export const BEDS = ["cafe", "barn", "haunt"] as const satisfies readonly SoundScene[];
 
-export const CUES = [
-  "gate-open",
-  "whoosh",
-  "door-cafe",
-  "door-barn",
-  "door-haunt",
-  "card-open",
-  "tag-open",
-  "basket-add",
-  "stamp",
-  "ticket-tear",
-  "hover",
-] as const;
+export type Bed = (typeof BEDS)[number];
+
+/** The one-off sounds: the creak of the gate, heard again in each building's door. */
+export const CUES = ["gate-open"] as const;
 
 export type Cue = (typeof CUES)[number];
 
 /** How loud each bed plays at rest. The haunt shop is the one place allowed to be loud. */
-export const BED_LEVEL: Readonly<Record<SoundScene, number>> = {
-  gate: 0.55,
-  square: 0.5,
+export const BED_LEVEL: Readonly<Record<Bed, number>> = {
   cafe: 0.5,
   barn: 0.5,
   haunt: 0.7,
 };
 
-/** How loud each one-off sound plays; the pointer's tick stays in the background. */
+/** How loud each one-off sound plays. */
 export const CUE_LEVEL: Readonly<Record<Cue, number>> = {
   "gate-open": 0.7,
-  whoosh: 0.45,
-  "door-cafe": 0.6,
-  "door-barn": 0.6,
-  "door-haunt": 0.7,
-  "card-open": 0.5,
-  "tag-open": 0.5,
-  "basket-add": 0.55,
-  stamp: 0.6,
-  "ticket-tear": 0.6,
-  hover: 0.16,
 };
 
 /** Seconds: one bed hands over to the next as slowly as a scene change takes. */
@@ -66,7 +46,7 @@ export function timeConstant(seconds: number): number {
 
 export type AudioFormat = "webm" | "mp3";
 
-export function audioUrl(name: SoundScene | Cue, format: AudioFormat): string {
+export function audioUrl(name: Bed | Cue, format: AudioFormat): string {
   return `/audio/${name}.${format}`;
 }
 
@@ -77,15 +57,15 @@ export function sceneAt(place: "square" | RoomId, onSquare: boolean): SoundScene
 }
 
 /** Each bed's target level for a scene (zero when the visitor is elsewhere or the sound is off). */
-export function bedTargets(scene: SoundScene | null): Record<SoundScene, number> {
-  const out = {} as Record<SoundScene, number>;
-  for (const s of SOUND_SCENES) out[s] = s === scene ? BED_LEVEL[s] : 0;
+export function bedTargets(scene: SoundScene | null): Record<Bed, number> {
+  const out = {} as Record<Bed, number>;
+  for (const bed of BEDS) out[bed] = bed === scene ? BED_LEVEL[bed] : 0;
   return out;
 }
 
-/** The door heard on the way into a building, or the rush of air on the way out. */
-export function moveCue(to: "square" | RoomId): Cue {
-  return to === "square" ? "whoosh" : `door-${to}`;
+/** The door creaking open on the way into a building; the way out is quiet. */
+export function moveCue(to: "square" | RoomId): Cue | null {
+  return to === "square" ? null : "gate-open";
 }
 
 const savedSound = z.object({ on: z.boolean() });

@@ -9,8 +9,12 @@ describe("sound", () => {
   });
 
   it("raises one bed and lowers every other", () => {
-    expect(bedTargets("cafe")).toEqual({ gate: 0, square: 0, cafe: BED_LEVEL.cafe, barn: 0, haunt: 0 });
+    expect(bedTargets("cafe")).toEqual({ cafe: BED_LEVEL.cafe, barn: 0, haunt: 0 });
     expect(Object.values(bedTargets(null)).every((level) => level === 0)).toBe(true);
+  });
+
+  it("leaves the gate and the square without a bed", () => {
+    for (const scene of ["gate", "square"] as const) expect(Object.values(bedTargets(scene)).every((level) => level === 0)).toBe(true);
   });
 
   it("lets the haunt shop be the loudest place on the farm", () => {
@@ -18,9 +22,9 @@ describe("sound", () => {
     for (const [, level] of others) expect(BED_LEVEL.haunt).toBeGreaterThan(level);
   });
 
-  it("opens a building's own door on the way in and rushes out on the way back", () => {
-    expect(moveCue("haunt")).toBe("door-haunt");
-    expect(moveCue("square")).toBe("whoosh");
+  it("creaks a door open on the way into a building and keeps the way out quiet", () => {
+    expect(moveCue("haunt")).toBe("gate-open");
+    expect(moveCue("square")).toBeNull();
     expect(CUES).toContain(moveCue("cafe"));
   });
 
@@ -37,7 +41,7 @@ describe("sound", () => {
   });
 
   it("points at the files in public/audio", () => {
-    expect(audioUrl("gate", "webm")).toBe("/audio/gate.webm");
-    expect(audioUrl("ticket-tear", "mp3")).toBe("/audio/ticket-tear.mp3");
+    expect(audioUrl("cafe", "webm")).toBe("/audio/cafe.webm");
+    expect(audioUrl("gate-open", "mp3")).toBe("/audio/gate-open.mp3");
   });
 });

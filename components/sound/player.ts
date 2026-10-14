@@ -7,12 +7,13 @@
  */
 import {
   type AudioFormat,
+  BEDS,
+  type Bed as BedName,
   CROSSFADE,
   CUES,
   CUE_LEVEL,
   type Cue,
   MASTER_FADE,
-  SOUND_SCENES,
   type SoundScene,
   audioUrl,
   bedTargets,
@@ -38,7 +39,7 @@ function preferredFormat(): AudioFormat {
 export class FarmSound implements SoundSink {
   private readonly ctx: AudioContext;
   private readonly master: GainNode;
-  private readonly beds = new Map<SoundScene, Bed>();
+  private readonly beds = new Map<BedName, Bed>();
   private readonly buffers = new Map<string, Promise<AudioBuffer | null>>();
   private format: AudioFormat = preferredFormat();
   private on = false;
@@ -84,7 +85,7 @@ export class FarmSound implements SoundSink {
     if (!this.on) return;
     const targets = bedTargets(scene);
     const now = this.ctx.currentTime;
-    for (const name of SOUND_SCENES) {
+    for (const name of BEDS) {
       const level = targets[name];
       const bed = this.beds.get(name) ?? (level > 0 ? this.bed(name) : null);
       if (!bed) continue;
@@ -132,7 +133,7 @@ export class FarmSound implements SoundSink {
     void this.ctx.close().catch(() => undefined);
   }
 
-  private bed(name: SoundScene): Bed {
+  private bed(name: BedName): Bed {
     const gain = this.ctx.createGain();
     gain.gain.value = 0;
     gain.connect(this.master);
@@ -141,7 +142,7 @@ export class FarmSound implements SoundSink {
     return bed;
   }
 
-  private async start(name: SoundScene, bed: Bed, generation: number) {
+  private async start(name: BedName, bed: Bed, generation: number) {
     const buffer = await this.buffer(name);
     if (!buffer || bed.source || bed.generation !== generation || this.current !== name) return;
     const source = this.ctx.createBufferSource();
@@ -153,7 +154,7 @@ export class FarmSound implements SoundSink {
     bed.source = source;
   }
 
-  /** The small sounds, fetched while the visitor is still listening to the first bed. */
+  /** The one-off sounds, fetched ahead so they are ready the moment they are needed. */
   private warmCues() {
     const warm = () => {
       for (const cue of CUES) void this.buffer(cue);
@@ -162,7 +163,7 @@ export class FarmSound implements SoundSink {
     else setTimeout(warm, 200);
   }
 
-  private buffer(name: SoundScene | Cue): Promise<AudioBuffer | null> {
+  private buffer(name: BedName | Cue): Promise<AudioBuffer | null> {
     let pending = this.buffers.get(name);
     if (!pending) {
       pending = this.load(name);
@@ -172,7 +173,7 @@ export class FarmSound implements SoundSink {
   }
 
   /** Opus in WebM where the browser plays it; MP3 where it does not, or where it would not decode. */
-  private async load(name: SoundScene | Cue): Promise<AudioBuffer | null> {
+  private async load(name: BedName | Cue): Promise<AudioBuffer | null> {
     for (const format of this.format === "webm" ? (["webm", "mp3"] as const) : (["mp3"] as const)) {
       try {
         const response = await fetch(audioUrl(name, format));

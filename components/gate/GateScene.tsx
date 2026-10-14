@@ -339,10 +339,7 @@ export function GateScene({
       if (target === rideTarget.current) return;
       rideTarget.current = target;
       controller.current?.setRide(target);
-      if (modeRef.current === "webgl") {
-        hold();
-        playCue("whoosh");
-      }
+      if (modeRef.current === "webgl") hold();
     },
     [hold],
   );
@@ -564,7 +561,6 @@ export function GateScene({
       }
       syncProps(jump);
       d.openBoard(true, jump);
-      if (!jump) playCue("whoosh");
       lenis.current?.stop();
     } else {
       d.openBoard(false);
@@ -676,7 +672,8 @@ export function GateScene({
       placeRef.current = place;
       // The sound goes ahead of the camera: the next bed comes up as the move plays.
       setSoundScene(sceneAt(place, true));
-      playCue(moveCue(place));
+      const cue = moveCue(place);
+      if (cue) playCue(cue);
       if (cardOpen.current) {
         cardOpen.current = false;
         setCard(null);
@@ -926,14 +923,8 @@ export function GateScene({
     controller.current?.seek(seek);
   }, [seek]);
 
-  const pointArm = useCallback((arm: ArmId, pointed: boolean) => {
-    driver.current?.pointArm(arm, pointed);
-    if (pointed) playCue("hover");
-  }, []);
-  const pointBoard = useCallback((pointed: boolean) => {
-    driver.current?.pointBoard(pointed);
-    if (pointed) playCue("hover");
-  }, []);
+  const pointArm = useCallback((arm: ArmId, pointed: boolean) => driver.current?.pointArm(arm, pointed), []);
+  const pointBoard = useCallback((pointed: boolean) => driver.current?.pointBoard(pointed), []);
 
   // The scene is heard while it is on the page: where it opened, then wherever the visitor goes.
   useEffect(() => {

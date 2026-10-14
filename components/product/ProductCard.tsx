@@ -1,7 +1,6 @@
 "use client";
 
-import { type CSSProperties, type KeyboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { playCue } from "@/components/sound/sound-bus";
+import { type CSSProperties, type KeyboardEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useFocusTrap } from "@/components/ui/useFocusTrap";
 import { useBasket } from "@/lib/basket-store";
@@ -81,9 +80,6 @@ export function ProductCard({ product, lang, t, from, seed, onClose }: ProductCa
   useLayoutEffect(() => {
     grow(false);
   }, [grow]);
-
-  // Paper unfolding, or the tag swinging out on its twine.
-  useEffect(() => playCue(recipe ? "card-open" : "tag-open"), [product.id, recipe]);
 
   const close = useCallback(() => {
     if (closing.current) return;

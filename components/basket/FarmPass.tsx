@@ -2,7 +2,6 @@
 
 import { type CSSProperties, type KeyboardEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { playCue } from "@/components/sound/sound-bus";
 import { Icon } from "@/components/ui/Icon";
 import { subscribeLenis } from "@/components/ui/lenis-channel";
 import { useFocusTrap } from "@/components/ui/useFocusTrap";
@@ -134,8 +133,6 @@ export function FarmPass({ lang, t, order, onClose }: { lang: Locale; t: Message
       () => {
         opening.commitStyles();
         opening.cancel();
-        // The ticket is down on the table: the moon stamp comes down on its stub.
-        playCue("stamp");
       },
       () => undefined,
     );
@@ -175,7 +172,6 @@ export function FarmPass({ lang, t, order, onClose }: { lang: Locale; t: Message
       link.download = `${t.passFile}-${order.day}.png`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
-      if (!torn.current) playCue("ticket-tear");
       if (!torn.current && !reduced()) {
         torn.current = true;
         stubRef.current?.animate(
