@@ -1100,3 +1100,369 @@
     transform: none;
   }
 }
+
+/* Products in the rooms: a seed over each, and the card that opens out of it. */
+@layer components {
+  /* A fingertip-sized button around each seed of light the scene draws. */
+  .seed {
+    position: absolute;
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    text-shadow: none;
+  }
+
+  .seed:focus-visible {
+    outline-offset: -8px;
+  }
+
+  /* Without the scene, the page marks the seed itself: a plain amber dot, no light. */
+  .seed-dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 9px;
+    height: 9px;
+    margin: -4.5px 0 0 -4.5px;
+    border-radius: var(--radius-pill);
+    background: var(--color-pumpkin-light);
+    box-shadow: 0 0 0 1.5px var(--color-cream);
+  }
+
+  .room-seeds[data-lit] .seed-dot {
+    opacity: 0;
+  }
+
+  /* The product's name, over its seed while it is pointed at or focused. */
+  .seed-label {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 6px);
+    padding: 2px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--color-cream);
+    color: var(--color-ink);
+    font-size: 15px;
+    line-height: 1.5;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translate3d(-50%, 4px, 0);
+    transition:
+      opacity var(--duration-tap) var(--ease-out),
+      transform var(--duration-tap) var(--ease-out);
+    pointer-events: none;
+  }
+
+  .seed:is(:hover, :focus-visible):not([data-open]) .seed-label {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0);
+  }
+
+  .card-layer {
+    z-index: 2;
+  }
+
+  /* A click back in the room puts the card away; the room is not dimmed. */
+  .card-scrim {
+    cursor: default;
+  }
+
+  .card {
+    position: absolute;
+    color: var(--color-ink);
+    outline: none;
+  }
+
+  .card-motion {
+    will-change: transform, opacity;
+  }
+
+  .card-photo img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 5;
+    border-radius: var(--radius-xs);
+    user-select: none;
+  }
+
+  .card-title {
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+    font-variation-settings: "opsz" 72, "SOFT" 30, "WONK" 0;
+    text-wrap: balance;
+  }
+
+  .card-description {
+    margin-top: 0.5rem;
+    font-size: var(--text-ui);
+    line-height: 1.5;
+  }
+
+  .card-close {
+    position: absolute;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: transform var(--duration-tap) var(--ease-out);
+  }
+
+  .card-close .mask-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .card-close:hover {
+    transform: rotate(90deg);
+  }
+
+  .card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+
+  .card-price {
+    font-size: 1.375rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .card-action {
+    min-height: 44px;
+    padding: 0.625rem 1.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-ink);
+    color: var(--color-paper);
+    font-size: var(--text-ui);
+    font-weight: 500;
+    line-height: 1.5;
+    cursor: pointer;
+    transition:
+      background-color var(--duration-tap) var(--ease-out),
+      transform var(--duration-tap) var(--ease-out);
+  }
+
+  .card-action:is(:hover, [data-done]) {
+    background: var(--color-bark);
+  }
+
+  .card-action:active {
+    transform: scale(0.97);
+  }
+
+  /* The recipe card: cream paper, torn by hand, on the right of the room. */
+  .card-recipe {
+    --top: calc(var(--spacing-gutter) + 3.5rem);
+    right: var(--spacing-gutter);
+    top: var(--top);
+    width: clamp(300px, min(26vw, 44lvh), 460px);
+  }
+
+  .recipe-shadow {
+    filter: drop-shadow(0 2px 3px rgb(43 33 28 / 0.35)) drop-shadow(0 18px 28px rgb(43 33 28 / 0.35));
+  }
+
+  .recipe-paper {
+    position: relative;
+    max-height: calc(100lvh - var(--top) - var(--spacing-gutter));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding: 3.25rem 1.75rem 1.75rem;
+    background: var(--color-cream) url(/textures/paper-cream.jpg) 0 0 / 480px auto;
+  }
+
+  .card-recipe .card-close {
+    top: 0.5rem;
+    right: 0.75rem;
+  }
+
+  .card-recipe .card-title {
+    margin-top: 1.25rem;
+    font-size: clamp(26px, 2.1vw, 34px);
+  }
+
+  .card-ingredients {
+    margin-top: 1rem;
+    font-family: var(--font-hand);
+    line-height: 1.2;
+  }
+
+  .card-ingredients h3 {
+    font-size: 1.75rem;
+    font-weight: 500;
+  }
+
+  .card-ingredients p {
+    margin-top: 0.125rem;
+    font-size: 1.375rem;
+  }
+
+  /* The tag: kraft card hung on twine from the top of the screen, swaying a little. */
+  .card-tag {
+    --twine: clamp(96px, 13lvh, 140px);
+    --eyelet: 46px;
+    --tag-w: clamp(280px, min(24vw, 38lvh), 400px);
+    left: 50%;
+    top: 0;
+    width: var(--tag-w);
+    margin-left: calc(var(--tag-w) / -2);
+  }
+
+  .tag-swing {
+    position: relative;
+    padding-top: var(--twine);
+    transform-origin: 50% 0;
+    animation:
+      tag-settle 1.9s var(--ease-out) both,
+      tag-sway 7s ease-in-out 1.9s infinite;
+  }
+
+  .tag-shadow {
+    filter: drop-shadow(0 2px 3px rgb(43 33 28 / 0.4)) drop-shadow(0 20px 26px rgb(43 33 28 / 0.35));
+  }
+
+  .tag-paper {
+    position: relative;
+    padding: 5rem 1.5rem 1.5rem;
+    background: #c9a77a url(/textures/paper-kraft.jpg) 0 0 / 420px auto;
+    clip-path: polygon(24% 0, 76% 0, 100% 56px, 100% 100%, 0 100%, 0 56px);
+  }
+
+  /* The paper ring that keeps the hole from tearing. */
+  .tag-eyelet {
+    position: absolute;
+    left: 50%;
+    top: calc(var(--eyelet) - 26px);
+    width: 52px;
+    height: 52px;
+    margin-left: -26px;
+    border-radius: var(--radius-pill);
+    background: #e3cfab url(/textures/paper-kraft.jpg) 30px 10px / 420px auto;
+    background-blend-mode: multiply;
+    box-shadow: inset 0 0 0 1px rgb(43 33 28 / 0.12);
+  }
+
+  /* Twine from above the screen's edge down through the grommet. */
+  .tag-twine {
+    position: absolute;
+    left: 50%;
+    top: -24px;
+    width: 34px;
+    height: calc(var(--twine) + var(--eyelet) + 24px);
+    margin-left: -17px;
+    background: url(/img/textures/twine.webp) 50% 100% / 100% auto no-repeat;
+    filter: drop-shadow(0 3px 2px rgb(43 33 28 / 0.35));
+  }
+
+  .tag-grommet {
+    position: absolute;
+    left: 50%;
+    top: calc(var(--twine) + var(--eyelet) - 15px);
+    width: 30px;
+    height: 30px;
+    margin-left: -15px;
+    background: url(/img/textures/grommet.webp) center / contain no-repeat;
+    filter: drop-shadow(0 1px 1px rgb(43 33 28 / 0.45));
+  }
+
+  .card-tag .card-close {
+    top: 3.75rem;
+    right: 0.5rem;
+  }
+
+  .card-tag .card-title {
+    margin-top: 1rem;
+    font-size: clamp(24px, 1.9vw, 30px);
+  }
+
+  /* The price inked on like a stamp. */
+  .card-stamp {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 600;
+    font-variation-settings: "opsz" 72, "SOFT" 60;
+    opacity: 0.9;
+    transform: rotate(-3deg);
+  }
+
+  @keyframes tag-settle {
+    0% {
+      rotate: 6deg;
+    }
+    22% {
+      rotate: -3.5deg;
+    }
+    46% {
+      rotate: 1.8deg;
+    }
+    70% {
+      rotate: -0.8deg;
+    }
+    100% {
+      rotate: 0deg;
+    }
+  }
+
+  @keyframes tag-sway {
+    0%,
+    100% {
+      rotate: 0deg;
+    }
+    25% {
+      rotate: 0.7deg;
+    }
+    75% {
+      rotate: -0.7deg;
+    }
+  }
+
+  /* Phones: the recipe comes up from the bottom as a sheet, its photo smaller; the tag hangs as it does. */
+  @media (max-width: 639px) {
+    .card-recipe {
+      --top: auto;
+      left: 0;
+      right: 0;
+      top: auto;
+      bottom: 0;
+      width: auto;
+    }
+
+    .recipe-paper {
+      max-height: 86svh;
+      padding: 3rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    }
+
+    .card-recipe .card-photo {
+      display: block;
+      width: min(56%, 240px);
+      margin-inline: auto;
+    }
+
+    .card-tag {
+      --twine: 84px;
+      --tag-w: min(80vw, 40svh, 320px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tag-swing {
+      animation: none;
+    }
+
+    .seed-label {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+}

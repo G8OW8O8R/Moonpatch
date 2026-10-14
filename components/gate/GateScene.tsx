@@ -3,6 +3,8 @@
 import "lenis/dist/lenis.css";
 import { usePathname } from "next/navigation";
 import { type MouseEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { ProductCard } from "@/components/product/ProductCard";
+import { RoomSeeds, type SeedOpen } from "@/components/product/RoomSeeds";
 import { RoomPlate, RoomUi } from "@/components/room/RoomView";
 import { type DoorParams, defaultDoor } from "@/lib/door-rig";
 import { type RigParams, defaultRig } from "@/lib/gate-rig";
@@ -43,6 +45,7 @@ export interface SquareCopy {
   visit: Messages["visit"];
   board: VisitCopy;
   rooms: Messages["rooms"];
+  product: Messages["product"];
   /** Page titles of the places the scene moves to by itself. */
   titles: Record<"square" | RoomId, string>;
 }
@@ -243,6 +246,10 @@ export function GateScene({
   /** The page has come to rest somewhere other than where it opened: a room seen from now on fades in. */
   const [settledInPage, setSettledInPage] = useState(false);
   const roomPlate = useRef<HTMLDivElement>(null);
+  const roomSeeds = useRef<HTMLDivElement>(null);
+  /** The product card open in the room, and the seed it opened out of. */
+  const [card, setCard] = useState<SeedOpen | null>(null);
+  const cardOpen = useRef(false);
   const roomHeading = useRef<HTMLHeadingElement>(null);
   /** What takes the focus once the page has caught up with a move: the room's name, or the arm of the building left. */
   const focusNext = useRef<"room" | RoomId | null>(null);
@@ -651,6 +658,11 @@ export function GateScene({
     (place: ScenePlace) => {
       if (place === placeRef.current) return;
       placeRef.current = place;
+      if (cardOpen.current) {
+        cardOpen.current = false;
+        setCard(null);
+      }
+      controller.current?.setSpot(null);
       cancelAnimationFrame(glideFrame.current);
       drag.current = null;
       const c = controller.current;
@@ -791,11 +803,11 @@ export function GateScene({
   const lookAt = useCallback((look: number) => {
     pan.current.look = look;
     controller.current?.setLook(look);
-    const img = roomPlate.current?.querySelector("img");
-    if (img) {
-      const size = sizeOf(stage.current);
-      const by = roomBox(size, ROOM_REST_ZOOM, look).x - roomBox(size, ROOM_REST_ZOOM, lookStart.current).x;
-      img.style.transform = by ? `translate3d(${by}px, 0, 0)` : "";
+    const size = sizeOf(stage.current);
+    const by = roomBox(size, ROOM_REST_ZOOM, look).x - roomBox(size, ROOM_REST_ZOOM, lookStart.current).x;
+    // The picture standing in for the scene, and the seeds over the products, move with the look.
+    for (const el of [roomPlate.current?.querySelector("img"), roomSeeds.current]) {
+      if (el) el.style.transform = by ? `translate3d(${by}px, 0, 0)` : "";
     }
   }, []);
 
@@ -856,6 +868,21 @@ export function GateScene({
     }
   }, [lookAt]);
   const unpoint = useCallback(() => controller.current?.setPointer(null), []);
+
+  const spot = useCallback((index: number | null) => controller.current?.setSpot(index), []);
+  const openCard = useCallback((open: SeedOpen) => {
+    cardOpen.current = true;
+    setCard(open);
+  }, []);
+  const closeCard = useCallback(() => {
+    cardOpen.current = false;
+    setCard(null);
+    controller.current?.setSpot(null);
+  }, []);
+  const cardSeed = useCallback(
+    () => (card ? (roomSeeds.current?.querySelector<HTMLElement>(`[data-product="${card.hotspot.product.id}"]`) ?? null) : null),
+    [card],
+  );
 
   useEffect(() => {
     doorRef.current = door;
@@ -1097,6 +1124,29 @@ export function GateScene({
             arrived={settledInPage}
             onBack={onBack}
             onNextDoor={onNextDoor}
+          >
+            <RoomSeeds
+              ref={roomSeeds}
+              room={inside}
+              lang={square.lang}
+              t={square.product}
+              roomTitle={square.rooms[inside].title}
+              lit={canvasShown}
+              open={card?.hotspot.product.id ?? null}
+              onOpen={openCard}
+              onSpot={spot}
+            />
+          </RoomUi>
+        )}
+        {inside && card && card.hotspot.product.building === inside && (
+          <ProductCard
+            key={card.hotspot.product.id}
+            product={card.hotspot.product}
+            lang={square.lang}
+            t={square.product}
+            from={card.at}
+            seed={cardSeed}
+            onClose={closeCard}
           />
         )}
         {boardOpen && <VisitBackdrop ref={backdrop} painted={canvasShown} />}

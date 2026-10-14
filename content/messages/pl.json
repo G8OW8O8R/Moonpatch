@@ -59,5 +59,15 @@
       "description": "Maski, czaszki i inne rzeczy, które straszą po zmroku. Jedyny sklep na farmie, który gryzie.",
       "alt": "Wnętrze sklepu ze straszydłami: ciemne ściany, półki z maskami w zielonym i różowym świetle, szkielet i zakapturzona postać przy ladzie, wydrążone dynie i niskie fioletowe światło przy podłodze."
     }
+  },
+  "product": {
+    "ingredients": "Składniki",
+    "ship": "Do taczki",
+    "visit": "Zarezerwuj na wizytę",
+    "shipped": "Już w taczce",
+    "kept": "Czeka na twoją wizytę",
+    "close": "Zamknij",
+    "seeds": "Do obejrzenia: {room}",
+    "price": "Cena"
   }
 }

@@ -1,5 +1,13 @@
 {
   "look": 0.62,
+  "hotspots": {
+    "01-pumpkin-spice-latte": [0.4, 0.5],
+    "02-cider-donuts": [0.44, 0.5],
+    "03-cinnamon-rolls": [0.48, 0.5],
+    "04-pumpkin-pie": [0.52, 0.5],
+    "05-pumpkin-butter": [0.56, 0.5],
+    "06-coffee-beans": [0.6, 0.5]
+  },
   "layers": [
     { "id": "door-left", "side": "left", "edge": [[0.09946, 0], [0.10183, 1]], "nearness": 1.15 },
     { "id": "door-right", "side": "right", "edge": [[0.91324, 0], [0.91172, 1]], "nearness": 1.15 }

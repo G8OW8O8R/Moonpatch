@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent, Ref } from "react";
+import type { CSSProperties, MouseEvent, ReactNode, Ref } from "react";
 import { Icon } from "@/components/ui/Icon";
 import type { Locale } from "@/lib/i18n";
 import { type Messages, format } from "@/lib/messages";
@@ -53,6 +53,8 @@ export interface RoomUiProps {
   onNextDoor(room: RoomId, event: MouseEvent<HTMLAnchorElement>): void;
   headingRef?: Ref<HTMLHeadingElement>;
   ref?: Ref<HTMLDivElement>;
+  /** The room's seeds, under the words. */
+  children?: ReactNode;
 }
 
 /**
@@ -60,9 +62,10 @@ export interface RoomUiProps {
  * the room's name in the bottom-left corner like a gallery label, and the
  * corridor of the three buildings in the order they stand on the square.
  */
-export function RoomUi({ room, lang, t, hint, arrived, onBack, onNextDoor, headingRef, ref }: RoomUiProps) {
+export function RoomUi({ room, lang, t, hint, arrived, onBack, onNextDoor, headingRef, ref, children }: RoomUiProps) {
   return (
     <div ref={ref} className="room-ui pointer-events-none absolute inset-0" data-arrived={arrived ? "" : undefined}>
+      {children}
       <a href={`${placePath(lang, "square")}#square`} onClick={onBack} className="room-back pointer-events-auto">
         <Icon name="arrow-left" className="room-back-arrow" />
         <span>{t.back}</span>

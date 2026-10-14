@@ -53,6 +53,9 @@ scope.onmessage = (event: MessageEvent<ToWorker>) => {
     case "look":
       engine?.setLook(message.look);
       break;
+    case "spot":
+      engine?.setSpot(message.spot);
+      break;
     case "seek":
       engine?.seek(message.at);
       break;

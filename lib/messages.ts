@@ -53,6 +53,16 @@ export const messagesSchema = z.strictObject({
     barn: room,
     haunt: room,
   }),
+  product: z.strictObject({
+    ingredients: text,
+    ship: text,
+    visit: text,
+    shipped: text,
+    kept: text,
+    close: text,
+    seeds: text.includes("{room}"),
+    price: text,
+  }),
 });
 
 export type Messages = z.infer<typeof messagesSchema>;

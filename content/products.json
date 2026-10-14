@@ -4,6 +4,7 @@
       "id": "01-pumpkin-spice-latte",
       "building": "cafe",
       "card": "recipe",
+      "fulfillment": "visit",
       "image": "/products/01-pumpkin-spice-latte",
       "price": {
         "usd": 6.5,
@@ -16,12 +17,17 @@
       "description": {
         "en": "Espresso, steamed milk, real roasted pumpkin and our own spice blend. Cinnamon on top, always.",
         "pl": "Espresso, spienione mleko, prawdziwa pieczona dynia i nasza mieszanka przypraw. Zawsze z cynamonem na wierzchu."
+      },
+      "ingredients": {
+        "en": "double shot of espresso, steamed whole milk, house-roasted pumpkin purée, a spoon of maple syrup, our spice blend (cinnamon, nutmeg, ginger, clove), a dusting of cinnamon on top",
+        "pl": "podwójne espresso, spienione pełne mleko, pieczone na miejscu puree z dyni, łyżka syropu klonowego, nasza mieszanka przypraw (cynamon, gałka muszkatołowa, imbir, goździk), cynamon na wierzch"
       }
     },
     {
       "id": "02-cider-donuts",
       "building": "cafe",
       "card": "recipe",
+      "fulfillment": "visit",
       "image": "/products/02-cider-donuts",
       "price": {
         "usd": 4.0,
@@ -34,12 +40,17 @@
       "description": {
         "en": "Made with pressed apple cider, rolled warm in cinnamon sugar.",
         "pl": "Na tłoczonym cydrze jabłkowym, obtaczane na ciepło w cukrze z cynamonem."
+      },
+      "ingredients": {
+        "en": "pressed apple cider reduced by half, buttermilk, flour, brown butter, a pinch of nutmeg, rolled warm in cinnamon sugar",
+        "pl": "tłoczony cydr jabłkowy odparowany do połowy, maślanka, mąka, masło klarowane na brązowo, szczypta gałki muszkatołowej, obtaczane na ciepło w cukrze z cynamonem"
       }
     },
     {
       "id": "03-cinnamon-rolls",
       "building": "cafe",
       "card": "recipe",
+      "fulfillment": "visit",
       "image": "/products/03-cinnamon-rolls",
       "price": {
         "usd": 7.0,
@@ -52,12 +63,17 @@
       "description": {
         "en": "Slow-proofed overnight, finished with a cream cheese glaze that won't stay put.",
         "pl": "Wyrastają przez całą noc, polane lukrem z serka, który nigdy nie zostaje na miejscu."
+      },
+      "ingredients": {
+        "en": "overnight brioche dough, brown sugar, Ceylon cinnamon, soft butter, cream cheese glaze with a little vanilla",
+        "pl": "ciasto brioche wyrastające przez noc, brązowy cukier, cynamon cejloński, miękkie masło, lukier z serka śmietankowego z odrobiną wanilii"
       }
     },
     {
       "id": "04-pumpkin-pie",
       "building": "cafe",
       "card": "recipe",
+      "fulfillment": "visit",
       "image": "/products/04-pumpkin-pie",
       "price": {
         "usd": 24.0,
@@ -70,12 +86,17 @@
       "description": {
         "en": "Hand-crimped butter crust, silky spiced filling. Serves eight, or two honest people.",
         "pl": "Ręcznie zaplatany kruchy spód i aksamitne, korzenne nadzienie. Dla ośmiu osób albo dwóch szczerych."
+      },
+      "ingredients": {
+        "en": "hand-crimped butter crust, roasted sugar pumpkin, fresh eggs, cream, brown sugar, cinnamon, ginger, clove",
+        "pl": "ręcznie zaplatany kruchy spód na maśle, pieczona dynia cukrowa, świeże jajka, śmietanka, brązowy cukier, cynamon, imbir, goździk"
       }
     },
     {
       "id": "05-pumpkin-butter",
       "building": "cafe",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/05-pumpkin-butter",
       "price": {
         "usd": 12.0,
@@ -94,6 +115,7 @@
       "id": "06-coffee-beans",
       "building": "cafe",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/06-coffee-beans",
       "price": {
         "usd": 16.0,
@@ -112,6 +134,7 @@
       "id": "07-plaid-blanket",
       "building": "barn",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/07-plaid-blanket",
       "price": {
         "usd": 89.0,
@@ -130,6 +153,7 @@
       "id": "08-dried-wreath",
       "building": "barn",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/08-dried-wreath",
       "price": {
         "usd": 64.0,
@@ -148,6 +172,7 @@
       "id": "09-ceramic-pumpkins",
       "building": "barn",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/09-ceramic-pumpkins",
       "price": {
         "usd": 48.0,
@@ -166,6 +191,7 @@
       "id": "10-amber-candle",
       "building": "barn",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/10-amber-candle",
       "price": {
         "usd": 28.0,
@@ -184,6 +210,7 @@
       "id": "11-stoneware-mug",
       "building": "barn",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/11-stoneware-mug",
       "price": {
         "usd": 24.0,
@@ -202,6 +229,7 @@
       "id": "12-beeswax-tapers",
       "building": "barn",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/12-beeswax-tapers",
       "price": {
         "usd": 18.0,
@@ -220,6 +248,7 @@
       "id": "13-zombie-mask",
       "building": "haunt",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/13-zombie-mask",
       "price": {
         "usd": 45.0,
@@ -238,6 +267,7 @@
       "id": "14-witch-hat",
       "building": "haunt",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/14-witch-hat",
       "price": {
         "usd": 32.0,
@@ -256,6 +286,7 @@
       "id": "15-glowing-skull",
       "building": "haunt",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/15-glowing-skull",
       "price": {
         "usd": 22.0,
@@ -274,6 +305,7 @@
       "id": "16-cauldron",
       "building": "haunt",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/16-cauldron",
       "price": {
         "usd": 38.0,
@@ -292,6 +324,7 @@
       "id": "17-little-skeleton",
       "building": "haunt",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/17-little-skeleton",
       "price": {
         "usd": 19.0,
@@ -310,6 +343,7 @@
       "id": "18-jack-o-lantern-lamp",
       "building": "haunt",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/18-jack-o-lantern-lamp",
       "price": {
         "usd": 42.0,
@@ -328,6 +362,7 @@
       "id": "19-mystery-box",
       "building": "haunt",
       "card": "tag",
+      "fulfillment": "ship",
       "image": "/products/19-mystery-box",
       "price": {
         "usd": 50.0,

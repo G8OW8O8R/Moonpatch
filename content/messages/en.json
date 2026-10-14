@@ -59,5 +59,15 @@
       "description": "Masks, skulls and other things that go bump in the night. The one shop on the farm that bites.",
       "alt": "Inside the haunt shop: dark walls, shelves of masks lit green and pink, a skeleton and a hooded reaper by the counter, jack-o'-lanterns and low purple light on the floor."
     }
+  },
+  "product": {
+    "ingredients": "Ingredients",
+    "ship": "Add to basket",
+    "visit": "Save for my visit",
+    "shipped": "In your wheelbarrow",
+    "kept": "Kept for your visit",
+    "close": "Close",
+    "seeds": "Things to look at in the {room}",
+    "price": "Price"
   }
 }

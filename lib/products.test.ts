@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import data from "@/content/products.json";
-import { catalogSchema, products, productsIn } from "./products";
+import { catalogSchema, formatPrice, productById, products, productsIn } from "./products";
 
 describe("product catalogue", () => {
   it("validates the content file", () => {
@@ -19,6 +19,31 @@ describe("product catalogue", () => {
     for (const product of products.filter((p) => p.card === "recipe")) {
       expect(product.building).toBe("cafe");
     }
+  });
+
+  it("prices in the language's currency", () => {
+    expect(formatPrice({ price: { usd: 6.5, pln: 24 } }, "en")).toBe("$6.50");
+    expect(formatPrice({ price: { usd: 89, pln: 329 } }, "en")).toBe("$89");
+    expect(formatPrice({ price: { usd: 6.5, pln: 24 } }, "pl").replace(/\s/g, " ")).toBe("24 zł");
+    expect(formatPrice({ price: { usd: 6.5, pln: 24.5 } }, "pl").replace(/\s/g, " ")).toBe("24,50 zł");
+  });
+
+  it("finds a product by its id", () => {
+    expect(productById("07-plaid-blanket")?.building).toBe("barn");
+    expect(productById("nope")).toBeUndefined();
+  });
+
+  it("keeps what cannot travel for the visit", () => {
+    const visit = products.filter((p) => p.fulfillment === "visit").map((p) => p.id);
+    expect(visit).toEqual(["01-pumpkin-spice-latte", "02-cider-donuts", "03-cinnamon-rolls", "04-pumpkin-pie"]);
+  });
+
+  it("lists ingredients on recipe cards only", () => {
+    const [recipe] = data.products;
+    const tag = data.products.find((p) => p.card === "tag");
+    const parse = (product: object) => catalogSchema.safeParse({ products: [product] }).success;
+    expect(parse({ ...recipe, ingredients: undefined })).toBe(false);
+    expect(parse({ ...tag, ingredients: { en: "wool", pl: "wełna" } })).toBe(false);
   });
 
   it.each(products.map((p) => [p.id, p.image] as const))("%s has AVIF and WebP photos", (_id, image) => {

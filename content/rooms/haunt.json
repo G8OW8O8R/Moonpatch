@@ -1,4 +1,13 @@
 {
   "look": 0.5,
+  "hotspots": {
+    "13-zombie-mask": [0.38, 0.5],
+    "14-witch-hat": [0.42, 0.5],
+    "15-glowing-skull": [0.46, 0.5],
+    "16-cauldron": [0.5, 0.5],
+    "17-little-skeleton": [0.54, 0.5],
+    "18-jack-o-lantern-lamp": [0.58, 0.5],
+    "19-mystery-box": [0.62, 0.5]
+  },
   "layers": [{ "id": "door-left", "side": "left", "edge": [[0.11141, 0], [0.1106, 1]], "nearness": 1.15 }]
 }

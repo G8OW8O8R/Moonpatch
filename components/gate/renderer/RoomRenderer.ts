@@ -4,11 +4,13 @@
  * on a screen with a mouse the room drifts a little with the pointer, the
  * leaves more, and on a narrow screen the leaves run a little ahead as the
  * room is panned. At rest, and still, it draws the plate's own file instead,
- * the very picture the page shows.
+ * the very picture the page shows. Each product lies in the room with a
+ * small warm seed of light on it, lit like the room's own bulbs.
  */
 import { type DoorParams, defaultDoor, leafWindow, roomWindow } from "@/lib/door-rig";
 import { leafPanShift } from "@/lib/room-pan";
 import type { PlateWindow } from "@/lib/gate-rig";
+import { hotspotsIn } from "@/lib/hotspots";
 import { PLATE, type Size } from "@/lib/plate-box";
 import { ROOMS, type RoomId, type RoomLayer, edgeMid, leafSpan } from "@/lib/rooms";
 import { type Corner, type GL, type Program, type Quad, createQuad, createTexture, drawQuad, finishProgram, startProgram, whenCompiled } from "./gl";
@@ -41,16 +43,42 @@ void main() {
 }
 `;
 
+/** Most seeds a room holds. */
+export const MAX_SEEDS = 8;
+
 const plateFragment = /* glsl */ `${header}
 uniform vec2 uViewport;
 uniform vec2 uOrigin;   // plate window, device px
 uniform float uScale;
 uniform vec2 uPlate;
 uniform sampler2D uTexture;
+uniform float uDpr;
+uniform int uSeedCount;
+uniform vec2 uSeeds[${MAX_SEEDS}];     // plate px
+uniform float uSeedGain[${MAX_SEEDS}]; // 0 dark, 1 lit, more when pointed at
 out vec4 outColour;
+
+// A seed is a tiny bulb: a hot filament-white core, a warm bloom around it, a faint wide spill.
+vec3 seeds(vec3 colour, vec2 plate) {
+  const vec3 warm = vec3(1.0, 0.64, 0.30);
+  const vec3 hot = vec3(1.0, 0.94, 0.80);
+  for (int i = 0; i < ${MAX_SEEDS}; i++) {
+    if (i >= uSeedCount) break;
+    float gain = uSeedGain[i];
+    if (gain <= 0.0) continue;
+    float d = length(plate - uSeeds[i]) * uScale / uDpr;   // CSS px
+    float bloom = exp(-d * d / 50.0) * 0.6 + exp(-d / 20.0) * 0.14;
+    colour = 1.0 - (1.0 - colour) * (1.0 - clamp(bloom * gain, 0.0, 1.0) * warm);
+    float core = smoothstep(3.4, 1.6, d) * min(gain, 1.0);
+    colour = mix(colour, hot, core);
+  }
+  return colour;
+}
+
 void main() {
   vec2 pixel = vec2(gl_FragCoord.x, uViewport.y - gl_FragCoord.y);
-  outColour = vec4(texture(uTexture, (pixel - uOrigin) / uScale / uPlate).rgb, 1.0);
+  vec2 plate = (pixel - uOrigin) / uScale;
+  outColour = vec4(seeds(texture(uTexture, plate / uPlate).rgb, plate), 1.0);
 }
 `;
 
@@ -86,6 +114,8 @@ export interface RoomFrame {
   lookStart?: number;
   /** How much of the room's leaf balance applies (0–1). */
   balance?: number;
+  /** Each seed's light, in the order of the room's hotspots (none: dark). */
+  seeds?: readonly number[];
   params?: DoorParams;
   /** A frame buffer of the canvas's size to draw into instead of the canvas. */
   into?: WebGLFramebuffer | null;
@@ -172,11 +202,12 @@ export class RoomRenderer {
     const gains = ROOMS[room].balance ?? [1, 1, 1];
     const b = frame.balance ?? 0;
 
+    const seeds = { room, gains: frame.seeds ?? [] };
     if (still && textures.plate) {
-      this.drawPlate(textures.plate, room0, dpr, canvas);
+      this.drawPlate(textures.plate, room0, dpr, canvas, seeds);
       return;
     }
-    this.drawPlate(textures.clean, plateWindow, dpr, canvas);
+    this.drawPlate(textures.clean, plateWindow, dpr, canvas, seeds);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     const p = this.leaf;
@@ -224,7 +255,7 @@ export class RoomRenderer {
     gl.deleteProgram(this.leaf.program);
   }
 
-  private drawPlate(texture: WebGLTexture, w: PlateWindow, dpr: number, canvas: { width: number; height: number }) {
+  private drawPlate(texture: WebGLTexture, w: PlateWindow, dpr: number, canvas: { width: number; height: number }, seeds: { room: RoomId; gains: readonly number[] }) {
     const { gl } = this;
     const p = this.plate;
     gl.useProgram(p.program);
@@ -236,6 +267,18 @@ export class RoomRenderer {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.uniform1i(p.uniform("uTexture"), 0);
+    const spots = hotspotsIn(seeds.room).slice(0, MAX_SEEDS);
+    const at = new Float32Array(MAX_SEEDS * 2);
+    const gain = new Float32Array(MAX_SEEDS);
+    spots.forEach((spot, i) => {
+      at[i * 2] = spot.u * PLATE.width;
+      at[i * 2 + 1] = spot.v * PLATE.height;
+      gain[i] = seeds.gains[i] ?? 0;
+    });
+    gl.uniform1f(p.uniform("uDpr"), dpr);
+    gl.uniform1i(p.uniform("uSeedCount"), spots.length);
+    gl.uniform2fv(p.uniform("uSeeds"), at);
+    gl.uniform1fv(p.uniform("uSeedGain"), gain);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 }
