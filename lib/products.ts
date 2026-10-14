@@ -48,16 +48,24 @@ export type Product = z.infer<typeof productSchema>;
 
 export const products: readonly Product[] = catalogSchema.parse(data).products;
 
-/** A demo price in the language's currency: dollars in English, złoty in Polish; whole amounts without the cents. */
-export function formatPrice(product: Pick<Product, "price">, lang: "en" | "pl"): string {
-  const amount = lang === "pl" ? product.price.pln : product.price.usd;
-  const whole = Number.isInteger(amount);
+/** An amount in the language's currency: dollars in English, złoty in Polish; whole amounts without the cents. */
+export function formatMoney(cents: number, lang: "en" | "pl"): string {
+  const whole = cents % 100 === 0;
   return new Intl.NumberFormat(lang === "pl" ? "pl-PL" : "en-US", {
     style: "currency",
     currency: lang === "pl" ? "PLN" : "USD",
     minimumFractionDigits: whole ? 0 : 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(cents / 100);
+}
+
+/** A product's demo price in cents of the language's currency. */
+export const priceCents = (product: Pick<Product, "price">, lang: "en" | "pl") =>
+  Math.round((lang === "pl" ? product.price.pln : product.price.usd) * 100);
+
+/** A demo price in the language's currency. */
+export function formatPrice(product: Pick<Product, "price">, lang: "en" | "pl"): string {
+  return formatMoney(priceCents(product, lang), lang);
 }
 
 export const productById = (id: string): Product | undefined => products.find((product) => product.id === id);

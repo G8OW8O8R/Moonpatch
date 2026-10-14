@@ -70,7 +70,7 @@ export function RoomUi({ room, lang, t, hint, arrived, onBack, onNextDoor, headi
         <Icon name="arrow-left" className="room-back-arrow" />
         <span>{t.back}</span>
       </a>
-      <div className="room-foot">
+      <div className="room-foot" style={{ "--look": ROOMS[room].look, "--safe-left": ROOMS[room].safeLeft } as CSSProperties}>
         <div className="room-plaque">
           <p className="room-caption">{format(t.plaque, { n: ROOM_ROW.indexOf(room) + 1 })}</p>
           <h1 ref={headingRef} tabIndex={-1} className="room-name font-display">

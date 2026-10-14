@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BasketButton } from "@/components/basket/BasketButton";
 import type { Locale } from "@/lib/i18n";
 import { format, type Messages } from "@/lib/messages";
 import { Icon } from "./Icon";
@@ -14,9 +15,8 @@ function Dot({ className = "" }: { className?: string }) {
   );
 }
 
-export function SiteHeader({ lang, t }: { lang: Locale; t: Messages["header"] }) {
+export function SiteHeader({ lang, t, tb }: { lang: Locale; t: Messages["header"]; tb: Messages["basket"] }) {
   const moonsFound = 0;
-  const basketCount = 0;
 
   return (
     <header className="site-header pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between gap-4 px-gutter pt-gutter">
@@ -53,11 +53,7 @@ export function SiteHeader({ lang, t }: { lang: Locale; t: Messages["header"] })
         </span>
 
         <Dot />
-        <span className="flex items-center gap-1.5">
-          <Icon name="wheelbarrow" className="drop-shadow-hug" />
-          <span aria-hidden="true">{basketCount}</span>
-          <span className="sr-only">{format(t.basket, { count: basketCount })}</span>
-        </span>
+        <BasketButton lang={lang} t={t} tb={tb} />
       </div>
     </header>
   );

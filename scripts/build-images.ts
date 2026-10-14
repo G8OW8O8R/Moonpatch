@@ -8,9 +8,10 @@
  * at the plate's full width (2576 landscape, 2552 portrait) and at 1600px.
  * The tag's twine and grommet → public/img/textures/{twine,grommet}.webp:
  * a straight run of the twine (the source lies in a curve) and a small ring.
+ * A room that grades its door leaves gets its picture from `pnpm rooms` instead.
  * Sources are never modified.
  */
-import { mkdir, readdir, stat } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat } from "node:fs/promises";
 import { join, parse } from "node:path";
 import sharp, { type Sharp } from "sharp";
 
@@ -95,14 +96,26 @@ async function buildTextures(): Promise<number> {
   return built;
 }
 
+/** Rooms whose picture `pnpm rooms` writes, with their leaves graded. */
+async function gradedRooms(): Promise<Set<string>> {
+  const rooms = new Set<string>();
+  for (const room of ["cafe", "barn", "haunt"]) {
+    const file = JSON.parse(await readFile(join(root, "content", "rooms", `${room}.json`), "utf8")) as { grade?: unknown };
+    if (file.grade) rooms.add(room);
+  }
+  return rooms;
+}
+
 async function main() {
   await mkdir(outDir, { recursive: true });
+  const skip = await gradedRooms();
   const files = (await readdir(sourceDir)).filter((file) => /\.jpe?g$/i.test(file)).sort();
   let built = 0;
 
   for (const file of files) {
     const source = join(sourceDir, file);
     const { name } = parse(file);
+    if (skip.has(name)) continue;
     const sourceMtime = (await stat(source)).mtimeMs;
     const { width: sourceWidth = 0 } = await sharp(source).metadata();
 

@@ -27,11 +27,18 @@ const layerSchema = z.strictObject({
 const gain = z.number().min(0.5).max(1.5);
 
 export const roomSchema = z.strictObject({
+  /** Where the room itself starts past the left door leaf, as a share of the plate's width: words keep off the leaf. */
+  safeLeft: share,
   /** Where a panning camera first looks, as a share of the plate's width. */
   look: share,
   /** Each product's seed on the plate, shares of its width and height, keyed by product id. */
   hotspots: z.record(z.string().regex(/^\d{2}-[a-z0-9-]+$/), point),
   layers: z.array(layerSchema).max(2),
+  /**
+   * White balance baked into the leaves (red, green, blue gains) when the room's
+   * pictures are built, so they keep the colour they have outside on the square.
+   */
+  grade: z.tuple([gain, gain, gain]).optional(),
   /**
    * Gains on the leaves' red, green and blue at the cut, where the leaves are
    * still seen in the square's light; they ease back to 1 as the room settles.

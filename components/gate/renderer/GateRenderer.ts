@@ -13,6 +13,7 @@ import {
   leafPoint,
   leafShade,
   peakRideSpeed,
+  project,
   restWindow,
   rideSpeed,
   shadowOnGround,
@@ -92,6 +93,15 @@ const smoothstep = (a: number, b: number, x: number) => {
 
 /** Where the closed leaves stand on the plate, with room for the drop rods. */
 const LEAF_AREA = { x0: 404, y0: 850, x1: 2212, y1: 1400 };
+
+/**
+ * The board hangs on chains under the beam, on the beam's own plane. Passing
+ * under it, the beam leaves the top of the frame long before the board, which
+ * would hang in the air for a few frames: so, as the beam nears the edge, the
+ * board rides up its chains behind the beam and leaves the frame with it.
+ */
+const HANGING = { x0: 860, x1: 1730, top: 300, beamBottom: 276, boardBottom: 504 };
+const isHanging = (r: LayerRect) => r.y >= HANGING.top && r.x >= HANGING.x0 && r.x + r.w <= HANGING.x1;
 
 /** Rows over which the road takes over from the square below the gate line. */
 const ROAD_FEATHER: readonly [number, number] = [1356, 1368];
@@ -297,6 +307,7 @@ export class GateRenderer {
     this.drawRoad(camera, dissolve, under);
 
     this.useWorld(this.sprite, camera);
+    const lift = this.hangingLift(state, camera, params);
     for (const layer of gateLayers) {
       const texture = this.textures.get(layer.id);
       if (!texture) continue;
@@ -306,7 +317,15 @@ export class GateRenderer {
         drawQuad(gl, this.quad, this.leafCorners(layer, camera, (p) => p));
       } else {
         gl.uniform1f(this.sprite.uniform("uShade"), 1);
-        this.drawCard(layer, camera.focal0);
+        if (layer.id === "arch") {
+          // The board first, so once lifted it slides behind the beam.
+          gl.uniform2f(this.sprite.uniform("uLift"), 0, -lift);
+          this.drawCard(layer, camera.focal0, "hanging");
+          gl.uniform2f(this.sprite.uniform("uLift"), 0, 0);
+          this.drawCard(layer, camera.focal0, "rest");
+        } else {
+          this.drawCard(layer, camera.focal0);
+        }
       }
     }
 
@@ -404,6 +423,21 @@ export class GateRenderer {
     const y1 = Math.round((box.y + box.height) * this.dpr);
     const texelsPerPixel = this.posterTexelWidth / (x1 - x0);
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0, lod: texelsPerPixel < 2 ? 0 : Math.floor(Math.log2(texelsPerPixel)) };
+  }
+
+  /**
+   * How far (world units, which on the gate plane are plate pixels) the board is
+   * pulled up its chains: nothing until the beam has covered most of its way to
+   * the top edge, then all of it by the time the beam's lower edge leaves the frame.
+   */
+  private hangingLift(state: SceneState, camera: Camera, params: RigParams): number {
+    const depth = groundDepth(GATE_GROUND_Y, camera.focal0);
+    const beam = unproject({ x: PRINCIPAL.x, y: HANGING.beamBottom }, depth, camera.focal0);
+    const now = project(camera, beam);
+    const rest = project(cameraAt({ opening: state.opening, ride: 0 }, this.css, params), beam);
+    if (!rest || rest.y <= 0) return 0;
+    const k = now ? smoothstep(0.4 * rest.y, 0, now.y) : 1;
+    return k * (HANGING.boardBottom - HANGING.beamBottom) * (depth / camera.focal0);
   }
 
   private bindTexture(program: Program, name: string, texture: WebGLTexture | undefined, unit: number) {
@@ -504,16 +538,18 @@ export class GateRenderer {
    * A card is a still plane at its contact depth, so its quads (only the
    * parts that hold wood) are built once and reused every frame.
    */
-  private drawCard(layer: GateLayer, focal0: number) {
+  private drawCard(layer: GateLayer, focal0: number, group?: "hanging" | "rest") {
     const { gl } = this;
-    let mesh = this.cardMeshes.get(layer.id);
+    const key = group ? `${layer.id}:${group}` : layer.id;
+    let mesh = this.cardMeshes.get(key);
     if (!mesh || mesh.focal0 !== focal0) {
       if (mesh) {
         gl.deleteVertexArray(mesh.vao);
         gl.deleteBuffer(mesh.buffer);
       }
       const { rect } = layer;
-      const parts = layer.parts?.length ? layer.parts : [rect];
+      const all = layer.parts?.length ? layer.parts : [rect];
+      const parts = group ? all.filter((r) => isHanging(r) === (group === "hanging")) : all;
       const depth = groundDepth(layer.contact ?? GATE_GROUND_Y, focal0);
       const data = new Float32Array(parts.length * 6 * 5);
       let o = 0;
@@ -540,7 +576,7 @@ export class GateRenderer {
       gl.enableVertexAttribArray(1);
       gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
       mesh = { vao, buffer, count: parts.length * 6, focal0 };
-      this.cardMeshes.set(layer.id, mesh);
+      this.cardMeshes.set(key, mesh);
     }
     gl.bindVertexArray(mesh.vao);
     gl.drawArrays(gl.TRIANGLES, 0, mesh.count);

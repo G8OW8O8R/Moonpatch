@@ -69,5 +69,29 @@
     "close": "Close",
     "seeds": "Things to look at in the {room}",
     "price": "Price"
+  },
+  "basket": {
+    "title": "Your wheelbarrow",
+    "close": "Close the wheelbarrow",
+    "empty": "Nothing in here yet. Pick something up in the café, the barn or the haunt shop.",
+    "ship": "Shipped to you",
+    "visit": "Waiting at the farm",
+    "day": "Pick the day you'll come by",
+    "dayHint": "Pick a day first, so it's ready when you get here.",
+    "less": "One less: {name}",
+    "more": "One more: {name}",
+    "qty": "{qty} × {name}",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "demo": "This is a demo shop. Nothing will be charged.",
+    "checkout": "Checkout",
+    "added": "{name} is in your wheelbarrow.",
+    "kept": "{name} is kept for your visit.",
+    "doneTitle": "All set",
+    "shipped": "Your shipped items would be on their way.",
+    "visitOn": "See you on {day} · {hours}",
+    "hours": "10 am – 8 pm",
+    "charged": "This is a demo shop, nothing was charged.",
+    "back": "Back to the farm"
   }
 }

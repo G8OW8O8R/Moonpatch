@@ -52,7 +52,7 @@ export default async function LangLayout({ children, params }: LayoutProps<"/[la
   return (
     <html lang={lang} className={fontVariables} style={motionCssVars() as CSSProperties} suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <SiteHeader lang={lang} t={t.header} />
+        <SiteHeader lang={lang} t={t.header} tb={t.basket} />
         {children}
         <ScrollMoon />
       </body>

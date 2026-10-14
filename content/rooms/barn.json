@@ -1,16 +1,18 @@
 {
+  "safeLeft": 0.131,
   "look": 0.5,
   "hotspots": {
     "07-plaid-blanket": [0.2777, 0.482],
     "08-dried-wreath": [0.5009, 0.4627],
     "09-ceramic-pumpkins": [0.1981, 0.6993],
-    "10-amber-candle": [0.5246, 0.6209],
+    "10-amber-candle": [0.7636, 0.4168],
     "11-stoneware-mug": [0.793, 0.6144],
-    "12-beeswax-tapers": [0.7636, 0.4164]
+    "12-beeswax-tapers": [0.4772, 0.5338]
   },
   "layers": [
     { "id": "door-left", "side": "left", "edge": [[0.12613, 0], [0.12663, 1]], "nearness": 1.15 },
     { "id": "door-right", "side": "right", "edge": [[0.88843, 0], [0.89197, 1]], "nearness": 1.15 }
   ],
-  "balance": [1.076, 0.798, 0.729]
+  "grade": [1.333, 0.875, 0.764],
+  "balance": [0.807, 0.912, 0.954]
 }

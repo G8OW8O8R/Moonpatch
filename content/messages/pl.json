@@ -69,5 +69,29 @@
     "close": "Zamknij",
     "seeds": "Do obejrzenia: {room}",
     "price": "Cena"
+  },
+  "basket": {
+    "title": "Twoja taczka",
+    "close": "Zamknij taczkę",
+    "empty": "Jeszcze pusto. Coś wpadnie ci w oko w kawiarni, w stodole albo u straszydeł.",
+    "ship": "Wyślemy do ciebie",
+    "visit": "Czeka na farmie",
+    "day": "Wybierz dzień przyjazdu",
+    "dayHint": "Najpierw wybierz dzień, żeby wszystko czekało gotowe.",
+    "less": "O jeden mniej: {name}",
+    "more": "O jeden więcej: {name}",
+    "qty": "{qty} × {name}",
+    "subtotal": "Razem",
+    "total": "Do zapłaty",
+    "demo": "To sklep demo. Nic nie zostanie pobrane.",
+    "checkout": "Zamawiam",
+    "added": "{name} jedzie w taczce.",
+    "kept": "{name} czeka na twoją wizytę.",
+    "doneTitle": "Gotowe",
+    "shipped": "Produkty do wysyłki byłyby już w drodze.",
+    "visitOn": "Do zobaczenia: {day} · {hours}",
+    "hours": "10:00–20:00",
+    "charged": "To sklep demo, nic nie zostało pobrane.",
+    "back": "Wróć na farmę"
   }
 }

@@ -3,6 +3,8 @@
 import { type CSSProperties, type KeyboardEvent, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { useFocusTrap } from "@/components/ui/useFocusTrap";
+import { useBasket } from "@/lib/basket-store";
+import { FLIGHT_EVENT, type FlightDetail } from "@/lib/flight";
 import { growFrom } from "@/lib/hotspots";
 import type { Locale } from "@/lib/i18n";
 import type { Messages } from "@/lib/messages";
@@ -22,9 +24,6 @@ export interface ProductCardProps {
 }
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-/** Tells the wheelbarrow; it listens from the moment it exists. */
-export const BASKET_EVENT = "moonpatch:basket-add";
 
 /**
  * A product's card, opened out of its seed in the room: a recipe card of
@@ -87,8 +86,14 @@ export function ProductCard({ product, lang, t, from, seed, onClose }: ProductCa
     close();
   };
 
+  /** Into the wheelbarrow; the photo flies up to it from where it sits on the card. */
   const act = () => {
-    window.dispatchEvent(new CustomEvent(BASKET_EVENT, { detail: { id: product.id } }));
+    useBasket.getState().add(product.id);
+    const box = sheet.current?.querySelector(".card-photo img")?.getBoundingClientRect();
+    if (box) {
+      const detail: FlightDetail = { id: product.id, from: { x: box.x, y: box.y, width: box.width, height: box.height } };
+      window.dispatchEvent(new CustomEvent(FLIGHT_EVENT, { detail }));
+    }
     setDone(true);
   };
 

@@ -816,6 +816,7 @@
 
   /* Over a room, type alone in the header's colour and hug: no backgrounds, frames or pills. */
   .room-ui {
+    container-type: size;
     color: var(--header-ink);
     text-shadow: var(--hug-room);
     transition: opacity var(--duration-reduced) var(--ease-out);
@@ -876,10 +877,14 @@
     row-gap: 0.75rem;
   }
 
+  /* Just past the left door leaf, framed as the plate is framed at rest (see .room-plate img), never on it. */
   .room-plaque {
+    --w: calc(max(100cqw, 100cqh * 2576 / 1438) * 1.04);
+    --leaf: calc(clamp(calc(100cqw - var(--w)), calc(50cqw - var(--look) * var(--w)), 0px) + var(--safe-left) * var(--w));
     grid-column: 1;
     grid-row: 1 / span 2;
     justify-self: start;
+    margin-left: max(0px, calc(var(--leaf) + 1rem - var(--spacing-gutter)));
   }
 
   .room-caption {
@@ -973,13 +978,14 @@
     align-items: center;
   }
 
+  /* The 40 % is the line's own ink; its hug stays whole (as the letters' does), or the rule melts into bright plaster. */
   .corridor-rule {
+    flex: none;
     width: 28px;
     height: 1px;
     margin-inline: 0.75rem;
-    background-color: currentColor;
-    box-shadow: 0 0 1px var(--header-halo), 0 0 2px color-mix(in srgb, var(--header-halo) 60%, transparent);
-    opacity: 0.4;
+    background-color: color-mix(in srgb, currentColor 40%, transparent);
+    box-shadow: 0 0 1px var(--header-halo), 0 0 2px color-mix(in srgb, var(--header-halo) 70%, transparent);
   }
 
   .corridor-here {
@@ -1033,6 +1039,7 @@
 
     .room-plaque {
       align-self: flex-start;
+      margin-left: 0;
       margin-bottom: 0.5rem;
     }
 
@@ -1045,7 +1052,7 @@
     }
 
     .corridor-rule {
-      width: 16px;
+      width: 24px;
       margin-inline: 0.375rem;
     }
   }
@@ -1463,6 +1470,456 @@
 
     .seed-label {
       transform: translate3d(-50%, 0, 0);
+    }
+  }
+}
+
+/* The wheelbarrow: a sheet of cream paper screwed to a board, the header's counter that opens it,
+   and the photo that flies into it. */
+@layer components {
+  :root[data-basket-open] {
+    overflow: hidden;
+  }
+
+  .basket-button {
+    cursor: pointer;
+    border-radius: var(--radius-xs);
+  }
+
+  .basket-barrow {
+    transform-origin: 30% 85%;
+  }
+
+  .flight-photo {
+    position: fixed;
+    z-index: 50;
+    object-fit: cover;
+    border-radius: var(--radius-xs);
+    pointer-events: none;
+    will-change: transform, opacity;
+    box-shadow: 0 6px 16px rgb(43 33 28 / 0.3);
+  }
+
+  .basket-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+  }
+
+  .basket-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgb(43 33 28 / 0.18);
+  }
+
+  .basket {
+    --top: calc(var(--spacing-gutter) + 3.5rem);
+    position: absolute;
+    top: var(--top);
+    right: var(--spacing-gutter);
+    width: clamp(360px, 30vw, 500px);
+    color: var(--color-ink);
+    outline: none;
+  }
+
+  .basket-motion {
+    will-change: transform, opacity;
+    filter: drop-shadow(0 2px 3px rgb(43 33 28 / 0.35)) drop-shadow(0 18px 28px rgb(43 33 28 / 0.35));
+  }
+
+  .basket-board {
+    padding: 20px 24px;
+    border-radius: var(--radius-sm);
+    background: var(--color-bark) url(/textures/wood-board.jpg) center / cover;
+  }
+
+  .basket-paper {
+    position: relative;
+    max-height: calc(100dvh - var(--top) - var(--spacing-gutter) - 40px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    padding: 2.75rem 1.75rem 1.75rem;
+    background: var(--color-cream) url(/textures/paper-cream.jpg) 0 0 / 480px auto;
+  }
+
+  .basket-screw {
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #6b625b, #2b2622 70%);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.35);
+  }
+
+  .basket-screw[data-at^="t"] {
+    top: 12px;
+  }
+
+  .basket-screw[data-at^="b"] {
+    bottom: 12px;
+  }
+
+  .basket-screw[data-at$="l"] {
+    left: 12px;
+  }
+
+  .basket-screw[data-at$="r"] {
+    right: 12px;
+  }
+
+  .basket-close {
+    position: absolute;
+    top: 0.75rem;
+    right: 1.5rem;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: transform var(--duration-tap) var(--ease-out);
+  }
+
+  .basket-close .mask-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .basket-close:hover {
+    transform: rotate(90deg);
+  }
+
+  .basket-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: clamp(28px, 2.3vw, 38px);
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1.1;
+    font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  }
+
+  .basket-title-barrow .mask-icon {
+    width: 44px;
+    height: 44px;
+  }
+
+  .basket-empty {
+    margin-top: 1.25rem;
+    font-size: var(--text-ui);
+  }
+
+  .basket-section {
+    margin-top: 1.25rem;
+  }
+
+  .basket-section-title {
+    margin-bottom: 0.25rem;
+    font-size: 1.125rem;
+    font-style: italic;
+    color: var(--color-bark);
+    font-variation-settings: "opsz" 24, "SOFT" 50, "WONK" 0;
+  }
+
+  .basket-line {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 1rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .basket-line > .basket-rule {
+    grid-column: 1 / -1;
+    margin-bottom: 0.75rem;
+  }
+
+  .basket-thumb img {
+    display: block;
+    width: 64px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: var(--radius-xs);
+    box-shadow: 0 0 0 3px var(--color-paper), 0 0 0 4px rgb(43 33 28 / 0.15);
+  }
+
+  .basket-name {
+    font-size: 1.0625rem;
+    line-height: 1.2;
+    font-variation-settings: "opsz" 24, "SOFT" 30, "WONK" 0;
+    text-wrap: balance;
+  }
+
+  .basket-qty {
+    display: inline-flex;
+    align-items: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .basket-qty > span {
+    min-width: 1.5ch;
+    text-align: center;
+  }
+
+  .basket-qty button {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+  }
+
+  .basket-qty button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .basket-qty .mask-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .basket-amount {
+    min-width: 4.5em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .basket-rule {
+    display: block;
+    width: 100%;
+    height: 6px;
+    overflow: visible;
+  }
+
+  .basket-rule path {
+    fill: none;
+    stroke: var(--color-ink);
+    stroke-width: 1.3;
+    stroke-linecap: round;
+    opacity: 0.8;
+  }
+
+  .basket-days {
+    margin-top: 0.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .basket-days-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.375rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+
+  .basket-days-legend .mask-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .basket-weekend {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 1rem;
+  }
+
+  .basket-day {
+    position: relative;
+    cursor: pointer;
+    font-size: 0.9375rem;
+    line-height: 2;
+  }
+
+  .basket-day > span {
+    position: relative;
+    opacity: 0.62;
+    transition: opacity var(--duration-tap) var(--ease-out);
+  }
+
+  /* The chosen day underlined by hand, drawn in from the left. */
+  .basket-day > span::after {
+    content: "";
+    position: absolute;
+    left: -2px;
+    right: -2px;
+    bottom: -3px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--color-pumpkin);
+    transform: scaleX(0) rotate(-1.5deg);
+    transform-origin: left;
+    transition: transform var(--duration-ui) var(--ease-out);
+  }
+
+  .basket-day:hover > span,
+  .basket-day:has(input:checked) > span {
+    opacity: 1;
+  }
+
+  .basket-day:has(input:checked) > span {
+    font-weight: 600;
+  }
+
+  .basket-day:has(input:checked) > span::after {
+    transform: scaleX(1) rotate(-1.5deg);
+  }
+
+  .basket-day:has(input:focus-visible) > span {
+    outline: 2px solid var(--color-pumpkin);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  .basket-day-hint {
+    margin-top: 0.25rem;
+    font-size: 0.9375rem;
+    color: var(--color-bark);
+  }
+
+  .basket-subtotal,
+  .basket-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .basket-subtotal {
+    font-size: 0.9375rem;
+    color: var(--color-bark);
+  }
+
+  .basket-total {
+    margin-top: 0.75rem;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-variation-settings: "opsz" 72, "SOFT" 30, "WONK" 0;
+  }
+
+  .basket-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+
+  .basket-demo {
+    max-width: 22ch;
+    font-size: 0.9375rem;
+    line-height: 1.4;
+  }
+
+  .basket-done {
+    margin-top: 1rem;
+    display: grid;
+    gap: 0.5rem;
+    font-size: var(--text-ui);
+  }
+
+  .basket-done-day {
+    font-size: 1.25rem;
+    font-style: italic;
+  }
+
+  .basket-link {
+    justify-self: start;
+    margin-top: 0.5rem;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+  }
+
+  /* Phones: a sheet up from the bottom, the board only a band along its top. */
+  @media (max-width: 639px) {
+    .basket {
+      --top: auto;
+      top: auto;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: auto;
+    }
+
+    .basket-board {
+      padding: 10px 0 0;
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+
+    .basket-paper {
+      max-height: 86svh;
+      padding: 2.5rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    }
+
+    .basket-screw[data-at^="b"] {
+      display: none;
+    }
+
+    .basket-close {
+      top: 0.5rem;
+      right: 1rem;
+    }
+
+    .basket-line {
+      grid-template-columns: 52px minmax(0, 1fr) auto;
+      grid-template-areas:
+        "rule rule rule"
+        "photo name amount"
+        "photo qty qty";
+      row-gap: 0.25rem;
+      column-gap: 0.75rem;
+    }
+
+    .basket-line > .basket-rule {
+      grid-area: rule;
+    }
+
+    .basket-thumb {
+      grid-area: photo;
+    }
+
+    .basket-thumb img {
+      width: 52px;
+      height: 65px;
+    }
+
+    .basket-name {
+      grid-area: name;
+    }
+
+    .basket-qty {
+      grid-area: qty;
+      margin-left: -8px;
+    }
+
+    .basket-qty button {
+      width: 40px;
+      height: 40px;
+    }
+
+    .basket-amount {
+      grid-area: amount;
+    }
+
+    .basket-foot {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .basket-demo {
+      max-width: none;
+    }
+
+    .basket-foot .card-action {
+      width: 100%;
     }
   }
 }

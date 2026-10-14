@@ -87,16 +87,18 @@ uniform float uScale;
 uniform vec2 uCentre;
 uniform float uFocal;
 uniform float uCameraZ;
+uniform vec2 uLift;     // world offset of a hung part (the board on its chains), zero for everything else
 out vec2 vUv;
 out vec3 vWorld;
 const float near = 8.0;
 void main() {
-  float w = aWorld.z - uCameraZ;
+  vec3 world = aWorld + vec3(uLift, 0.0);
+  float w = world.z - uCameraZ;
   // screen = origin + scale * (centre + focal * xy / w), kept multiplied by w so the GPU clips at the near plane
-  vec2 screen = (uOrigin + uScale * uCentre) * w + uScale * uFocal * aWorld.xy;
+  vec2 screen = (uOrigin + uScale * uCentre) * w + uScale * uFocal * world.xy;
   gl_Position = vec4(2.0 * screen.x / uViewport.x - w, w - 2.0 * screen.y / uViewport.y, w - 2.0 * near, w);
   vUv = aUv;
-  vWorld = aWorld;
+  vWorld = world;
 }
 `;
 

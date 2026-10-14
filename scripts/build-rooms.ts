@@ -7,9 +7,13 @@
  *
  * Every leaf on the plates is cut along one straight edge (content/rooms/*.json,
  * shares of the plate), so its mask is exact: everything between the edge and
- * the side of the plate, with a two-pixel ramp across the edge itself.
+ * the side of the plate, with a two-pixel ramp across the edge itself. A room
+ * may grade its leaves (`grade`, gains on red, green, blue) so the doors keep
+ * the white they have outside; the grade follows the mask, ramp included.
  *
  *   <room>-<layer>-<width>   the leaf as WebP with alpha, cropped to its side.
+ *   plates/<room>-<width>    the room's own picture, written here instead of by
+ *                            `pnpm images` when the room grades its leaves.
  *   <room>-clean-<width>     the plate with the room carried on under each
  *                            leaf, mirrored across the edge, for as far as a
  *                            leaf can ever slide away from it. Within the
@@ -24,6 +28,7 @@ import sharp from "sharp";
 
 const root = process.cwd();
 const outDir = join(root, "public", "img", "rooms");
+const plateDir = join(root, "public", "img", "plates");
 const debugArg = process.argv.find((arg) => arg.startsWith("--debug="));
 const debugDir = debugArg ? join(root, debugArg.slice("--debug=".length)) : null;
 
@@ -49,6 +54,7 @@ interface Layer {
 interface RoomFile {
   look: number;
   layers: Layer[];
+  grade?: [number, number, number];
 }
 
 const readRoom = async (room: Room): Promise<RoomFile> =>
@@ -77,6 +83,23 @@ const sampleRow = (rgb: Buffer, y: number, x: number, c: number) => {
   const t = fx - x0;
   return rgb[(y * W + x0) * 3 + c]! * (1 - t) + rgb[(y * W + x1) * 3 + c]! * t;
 };
+
+/** The plate with each leaf's white balance applied, weighted by the leaf's mask. */
+function graded(rgb: Buffer, layers: Layer[], gains: [number, number, number]): Buffer {
+  const out = Buffer.from(rgb);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      let a = 0;
+      for (const layer of layers) a = Math.max(a, alphaAt(into(layer, x, y)));
+      if (a <= 0) continue;
+      const o = (y * W + x) * 3;
+      for (let c = 0; c < 3; c++) {
+        const v = rgb[o + c]!;
+        out[o + c] = Math.min(255, Math.max(0, Math.round(v + (v * gains[c]! - v) * a)));
+      }
+    }
+  return out;
+}
 
 /** Pixels this far from the edge are taken as clean door or clean room. */
 const CLEAR = RAMP + 1.5;
@@ -224,14 +247,21 @@ async function writeDebug(room: Room, rgb: Buffer, clean: Buffer, cuts: Cut[], l
 async function main() {
   await mkdir(outDir, { recursive: true });
   for (const room of ROOMS) {
-    const { layers } = await readRoom(room);
-    const { data: rgb, info } = await sharp(join(root, "public", "plates", `${room}.jpg`)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { layers, grade } = await readRoom(room);
+    const { data: source, info } = await sharp(join(root, "public", "plates", `${room}.jpg`)).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     if (info.width !== W || info.height !== H) throw new Error(`${room}.jpg must be ${W}×${H}`);
+    const rgb = grade ? graded(source, layers, grade) : source;
     const { clean, cuts } = lift(rgb, layers);
     await writeDebug(room, rgb, clean, cuts, layers);
     if (debugDir && process.argv.includes("--preview")) continue;
     for (const width of WIDTHS) {
       const height = Math.round((H * width) / W);
+      if (grade) {
+        await mkdir(plateDir, { recursive: true });
+        const own = sharp(rgb, { raw: { width: W, height: H, channels: 3 } }).resize(width, height, { kernel: "lanczos3" });
+        await own.clone().avif({ quality: 56, effort: 6, chromaSubsampling: "4:4:4" }).toFile(join(plateDir, `${room}-${width}.avif`));
+        await own.webp({ quality: 80, effort: 6, smartSubsample: true }).toFile(join(plateDir, `${room}-${width}.webp`));
+      }
       const plate = sharp(clean, { raw: { width: W, height: H, channels: 3 } }).resize(width, height, { kernel: "lanczos3" });
       await plate.clone().avif({ quality: 56, effort: 6, chromaSubsampling: "4:4:4" }).toFile(join(outDir, `${room}-clean-${width}.avif`));
       await plate.webp({ quality: 82, effort: 6, smartSubsample: true }).toFile(join(outDir, `${room}-clean-${width}.webp`));
