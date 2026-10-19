@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { itemCount } from "@/lib/basket";
 import { BASKET_STORAGE_KEY, rehydrateBasket, useBasket } from "@/lib/basket-store";
@@ -10,8 +10,16 @@ import { type Messages, format } from "@/lib/messages";
 import { cubicBezier, duration, ease } from "@/lib/motion-tokens";
 import { productById } from "@/lib/products";
 import { type PassOrder } from "@/lib/farm-pass";
-import { BasketDialog } from "./BasketDialog";
-import { FarmPass } from "./FarmPass";
+
+// The wheelbarrow's sheet and the pass come in when they are wanted, not with the first screen.
+const loadDialog = () => import("./BasketDialog");
+const loadPass = () => import("./FarmPass");
+const BasketDialog = lazy(() => loadDialog().then((m) => ({ default: m.BasketDialog })));
+const FarmPass = lazy(() => loadPass().then((m) => ({ default: m.FarmPass })));
+/** Asked for as the button is pressed or focused; a click that comes first opens it once it is in. */
+const warmDialog = () => {
+  for (const load of [loadDialog, loadPass]) void load().catch(() => undefined);
+};
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -82,31 +90,36 @@ export function BasketButton({ lang, t, tb }: { lang: Locale; t: Messages["heade
       <button
         type="button"
         onClick={() => setOpen(true)}
+        onPointerDown={warmDialog}
+        onTouchStart={warmDialog}
+        onFocus={warmDialog}
         aria-haspopup="dialog"
         aria-expanded={open || !!pass}
         aria-label={format(t.basket, { count })}
         className="basket-button flex items-center gap-1.5"
       >
         <span ref={barrow} className="basket-barrow inline-flex">
-          <Icon name="wheelbarrow" className="drop-shadow-hug" />
+          <Icon name="wheelbarrow" halo />
         </span>
         <span aria-hidden="true">{count}</span>
       </button>
       <span role="status" className="sr-only">
         {said}
       </span>
-      {open && (
-        <BasketDialog
-          lang={lang}
-          t={tb}
-          onClose={() => setOpen(false)}
-          onPass={(order) => {
-            setOpen(false);
-            setPass(order);
-          }}
-        />
-      )}
-      {pass && <FarmPass lang={lang} t={tb} order={pass} onClose={() => setPass(null)} />}
+      <Suspense fallback={null}>
+        {open && (
+          <BasketDialog
+            lang={lang}
+            t={tb}
+            onClose={() => setOpen(false)}
+            onPass={(order) => {
+              setOpen(false);
+              setPass(order);
+            }}
+          />
+        )}
+        {pass && <FarmPass lang={lang} t={tb} order={pass} onClose={() => setPass(null)} />}
+      </Suspense>
     </>
   );
 }

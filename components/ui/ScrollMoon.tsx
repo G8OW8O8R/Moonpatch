@@ -85,7 +85,7 @@ export function ScrollMoon() {
     <div ref={root} aria-hidden="true" className="scroll-moon">
       <span className="scroll-moon-line" />
       <span ref={rail} className="scroll-moon-rail">
-        <Icon name="moon" className="scroll-moon-thumb drop-shadow-hug" />
+        <Icon name="moon" className="scroll-moon-thumb" halo />
       </span>
     </div>
   );

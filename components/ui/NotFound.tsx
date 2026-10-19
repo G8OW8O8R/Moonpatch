@@ -32,7 +32,7 @@ export function NotFound({ lang, t }: { lang: Locale; t: Messages["notFound"] })
         <h1 className="lost-title font-display">{t.title}</h1>
         <p className="lost-line">{t.line}</p>
         <a href={placePath(lang, "square")} className="lost-back">
-          <Icon name="arrow-left" className="lost-back-arrow" />
+          <Icon name="arrow-left" className="lost-back-arrow" halo />
           <span>{t.back}</span>
         </a>
       </div>

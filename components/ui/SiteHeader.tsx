@@ -6,6 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import { format, type Messages } from "@/lib/messages";
 import { Icon } from "./Icon";
 import { LanguageSwitch } from "./LanguageSwitch";
+import { Wordmark } from "./Wordmark";
 
 const MOONS_TOTAL = 4;
 
@@ -27,9 +28,9 @@ export function SiteHeader({ lang, t, tb }: { lang: Locale; t: Messages["header"
         href={`/${lang}`}
         prefetch={false}
         aria-label={t.home}
-        className="wordmark-link pointer-events-auto block shrink-0 rounded-sm drop-shadow-hug"
+        className="wordmark-link pointer-events-auto block shrink-0 rounded-sm"
       >
-        <span aria-hidden="true" className="wordmark block" />
+        <Wordmark className="wordmark block" />
       </Link>
 
       <div className="status-row pointer-events-auto flex flex-wrap items-center justify-end gap-x-2.5 gap-y-1 text-header font-medium text-shadow-hug tabular-nums sm:flex-nowrap sm:gap-x-3.5">
@@ -47,7 +48,7 @@ export function SiteHeader({ lang, t, tb }: { lang: Locale; t: Messages["header"
           <>
             <Dot />
             <span className="flex items-center gap-1.5">
-              <Icon name="moon" className="drop-shadow-hug" />
+              <Icon name="moon" halo />
               <span aria-hidden="true">
                 {moonsFound}/{MOONS_TOTAL}
               </span>

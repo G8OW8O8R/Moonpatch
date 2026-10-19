@@ -66,7 +66,7 @@ export function SoundSwitch({ label }: { label: string }) {
 
   return (
     <button type="button" onClick={toggle} aria-pressed={on} className="sound-switch flex items-center gap-1.5">
-      <Icon name={on ? "sound-on" : "sound-off"} className="drop-shadow-hug" />
+      <Icon name={on ? "sound-on" : "sound-off"} halo />
       <span>{label}</span>
     </button>
   );

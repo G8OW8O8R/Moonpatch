@@ -45,8 +45,10 @@ export interface RoomUiProps {
   room: RoomId;
   lang: Locale;
   t: Messages["rooms"];
-  /** Show the hint about looking around (narrow touch screens, once a visit). */
+  /** The hint about looking around is read out (narrow touch screens, once a visit). */
   hint: boolean;
+  /** Not yet done this visit: shown wherever the stylesheet finds a narrow touch screen. */
+  hintWanted: boolean;
   /** Reached within the visit: the room's name rises into place as the camera lands. */
   arrived: boolean;
   onBack(event: MouseEvent<HTMLAnchorElement>): void;
@@ -62,12 +64,12 @@ export interface RoomUiProps {
  * the room's name in the bottom-left corner like a gallery label, and the
  * corridor of the three buildings in the order they stand on the square.
  */
-export function RoomUi({ room, lang, t, hint, arrived, onBack, onNextDoor, headingRef, ref, children }: RoomUiProps) {
+export function RoomUi({ room, lang, t, hint, hintWanted, arrived, onBack, onNextDoor, headingRef, ref, children }: RoomUiProps) {
   return (
     <div ref={ref} className="room-ui pointer-events-none absolute inset-0" data-arrived={arrived ? "" : undefined}>
       {children}
       <a href={`${placePath(lang, "square")}#square`} onClick={onBack} className="room-back pointer-events-auto">
-        <Icon name="arrow-left" className="room-back-arrow" />
+        <Icon name="arrow-left" className="room-back-arrow" halo />
         <span>{t.back}</span>
       </a>
       <div className="room-foot" style={{ "--look": ROOMS[room].look, "--safe-left": ROOMS[room].safeLeft } as CSSProperties}>
@@ -77,7 +79,7 @@ export function RoomUi({ room, lang, t, hint, arrived, onBack, onNextDoor, headi
             <span className="room-name-line">{t[room].title}</span>
           </h1>
         </div>
-        <p aria-hidden={!hint} data-shown={hint ? "" : undefined} className="room-hint">
+        <p aria-hidden={!hint} data-shown={hintWanted ? "" : undefined} className="room-hint">
           {t.swipe}
         </p>
         <nav aria-label={t.corridor} className="room-corridor pointer-events-auto">
@@ -87,7 +89,7 @@ export function RoomUi({ room, lang, t, hint, arrived, onBack, onNextDoor, headi
                 {i > 0 && <span aria-hidden="true" className="corridor-rule" />}
                 {id === room ? (
                   <span aria-current="page" className="corridor-here">
-                    <Icon name="moon" className="corridor-moon" />
+                    <Icon name="moon" className="corridor-moon" halo />
                     {t[id].title}
                   </span>
                 ) : (

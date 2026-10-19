@@ -268,7 +268,10 @@ export function GateScene({
   const swipedBefore = useSyncExternalStore(watchNothing, swiped, never);
   const [swipedHere, setSwipedHere] = useState(false);
   const swipeNoted = useRef(false);
-  const hint = !!inside && narrowTouch && !swipedBefore && !swipedHere;
+  // Wanted until the visitor has looked around; the stylesheet shows it on narrow touch screens only,
+  // so it is there with the room's first paint rather than after the page has woken up.
+  const hintWanted = !!inside && !swipedBefore && !swipedHere;
+  const hint = hintWanted && narrowTouch;
   /** A move to or from a building is playing: nothing may render on the page until it lands. */
   const moving = useRef(false);
   const squareLayer = useRef<HTMLDivElement>(null);
@@ -1156,6 +1159,7 @@ export function GateScene({
             lang={square.lang}
             t={square.rooms}
             hint={hint}
+            hintWanted={hintWanted}
             arrived={settledInPage}
             onBack={onBack}
             onNextDoor={onNextDoor}

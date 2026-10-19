@@ -112,24 +112,23 @@
     0 0 8px color-mix(in srgb, var(--h) 30%, transparent);
 }
 
-/* The same hug for icons and the wordmark. Chained drop shadows compound, so
-   each step is lighter than its text counterpart. */
-@utility drop-shadow-hug {
-  --h: var(--header-halo);
-  filter: drop-shadow(0 0 0.5px var(--h)) drop-shadow(0 0 1px var(--h))
-    drop-shadow(0 0 2px color-mix(in srgb, var(--h) 80%, transparent))
-    drop-shadow(0 0 5px color-mix(in srgb, var(--h) 30%, transparent));
-}
-
 @layer components {
-  /* Single-colour SVGs from /public drawn in currentColor, files left untouched. */
-  .mask-icon {
+  /* The icons of /public/icons, inline in currentColor. */
+  .ui-icon {
     display: inline-block;
     flex: none;
     width: 1.25em;
     height: 1.25em;
-    background-color: currentColor;
-    mask: var(--mask) center / contain no-repeat;
+    overflow: visible;
+  }
+
+  /* The halo's bands are measured in screen pixels, whatever the icon's size. */
+  .icon-hug {
+    stroke: var(--header-halo);
+  }
+
+  .icon-hug :is(path, circle, rect) {
+    vector-effect: non-scaling-stroke;
   }
 
   .site-header {
@@ -140,12 +139,12 @@
     transition: color var(--duration-scene-short) var(--ease-in-out);
   }
 
-  /* The wordmark file stays as delivered; it is painted in the header colour through a mask. */
+  /* Drawn inline in the header colour, so it is there with the first paint. */
   .wordmark {
     width: var(--logo-width);
     height: var(--logo-height);
-    background-color: currentColor;
-    mask: url(/brand/wordmark.svg) center / contain no-repeat;
+    /* Room for the halo past the drawing's edge. */
+    overflow: visible;
   }
 
   /* Centre the status row on the "Moonpatch" line of the wordmark. */
@@ -223,7 +222,7 @@
     left: 0;
   }
 
-  .scroll-moon-thumb .mask-icon {
+  .scroll-moon-thumb .ui-icon {
     width: 10px;
     height: 10px;
   }
@@ -424,7 +423,7 @@
     opacity: 1;
   }
 
-  .hint-arrow .mask-icon {
+  .hint-arrow .ui-icon {
     width: 1.1em;
     height: 1.1em;
   }
@@ -828,12 +827,6 @@
     transition-delay: 100ms;
   }
 
-  .room-ui :is(.room-back-arrow, .corridor-moon) {
-    filter: drop-shadow(0 0 0.5px var(--header-halo)) drop-shadow(0 0 1px var(--header-halo))
-      drop-shadow(0 0 2px color-mix(in srgb, var(--header-halo) 80%, transparent))
-      drop-shadow(0 0 5px color-mix(in srgb, var(--header-halo) 30%, transparent));
-  }
-
   /* The way back, under the wordmark, at the size of the header's row. */
   .room-back {
     position: absolute;
@@ -849,7 +842,7 @@
     text-transform: uppercase;
   }
 
-  .room-back-arrow .mask-icon {
+  .room-back-arrow .ui-icon {
     width: 1.1em;
     height: 1.1em;
   }
@@ -955,8 +948,11 @@
     transition: opacity var(--duration-tap) var(--ease-out);
   }
 
-  .room-hint[data-shown] {
-    opacity: 1;
+  /* The same screens the room pans on by touch. */
+  @media (pointer: coarse) and (aspect-ratio < 1.55) {
+    .room-hint[data-shown] {
+      opacity: 1;
+    }
   }
 
   /* The corridor: the three buildings as they stand on the square, a rule between each. */
@@ -996,7 +992,7 @@
     gap: 0.375rem;
   }
 
-  .corridor-moon .mask-icon {
+  .corridor-moon .ui-icon {
     width: 10px;
     height: 10px;
   }
@@ -1157,7 +1153,7 @@
   }
 
   .seed-icon,
-  .seed-icon .mask-icon {
+  .seed-icon .ui-icon {
     width: 20px;
     height: 20px;
   }
@@ -1370,7 +1366,7 @@
     transition: transform var(--duration-tap) var(--ease-out);
   }
 
-  .card-close .mask-icon {
+  .card-close .ui-icon {
     width: 22px;
     height: 22px;
   }
@@ -1750,7 +1746,7 @@
     transition: transform var(--duration-tap) var(--ease-out);
   }
 
-  .basket-close .mask-icon {
+  .basket-close .ui-icon {
     width: 22px;
     height: 22px;
   }
@@ -1781,7 +1777,7 @@
     font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   }
 
-  .basket-title-barrow .mask-icon {
+  .basket-title-barrow .ui-icon {
     width: 44px;
     height: 44px;
   }
@@ -1857,7 +1853,7 @@
     cursor: default;
   }
 
-  .basket-qty .mask-icon {
+  .basket-qty .ui-icon {
     width: 16px;
     height: 16px;
   }
@@ -1898,7 +1894,7 @@
     font-weight: 500;
   }
 
-  .basket-days-legend .mask-icon {
+  .basket-days-legend .ui-icon {
     width: 18px;
     height: 18px;
   }
@@ -2320,7 +2316,7 @@
     opacity: 0.7;
   }
 
-  .pass-link-arrow .mask-icon {
+  .pass-link-arrow .ui-icon {
     width: 1.1em;
     height: 1.1em;
   }
@@ -2406,12 +2402,7 @@
     text-shadow: var(--hug-room);
   }
 
-  .lost-back-arrow {
-    filter: drop-shadow(0 0 0.5px var(--header-halo)) drop-shadow(0 0 1px var(--header-halo))
-      drop-shadow(0 0 2px color-mix(in srgb, var(--header-halo) 80%, transparent));
-  }
-
-  .lost-back-arrow .mask-icon {
+  .lost-back-arrow .ui-icon {
     width: 1.1em;
     height: 1.1em;
   }
