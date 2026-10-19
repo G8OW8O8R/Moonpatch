@@ -29,16 +29,16 @@ Moonpatch Farm is a fictional autumn pumpkin farm told as a site you walk throug
 
 ## Lighthouse
 
-Measured on production (`https://moonpatch.vercel.app`) on 2026-10-14: Lighthouse 13.5.0, headless Chrome 155, default simulated throttling (mobile: the default preset, Moto G Power on slow 4G with a 4× slower CPU; desktop: the `desktop` preset). Three runs per row, each value is the median of the three.
+Measured on production (`https://moonpatch.vercel.app`) on 2026-10-19: Lighthouse 13.5.0, headless Chrome 155, default simulated throttling (mobile: the default preset, Moto G Power on slow 4G with a 4× slower CPU; desktop: the `desktop` preset). Three runs per row, each value is the median of the three.
 
 | Page | Device | Performance | Accessibility | Best practices | SEO | FCP | LCP | TBT | CLS | Speed Index |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| [`/pl`](https://moonpatch.vercel.app/pl) | desktop | 93 | 100 | 100 | 100 | 0.5 s | 1.2 s | 6.5 ms | 0 | 1.7 s |
-| [`/pl`](https://moonpatch.vercel.app/pl) | mobile | 57 | 100 | 100 | 100 | 3.6 s | 6.8 s | 285 ms | 0 | 6.7 s |
-| [`/pl/kawiarnia`](https://moonpatch.vercel.app/pl/kawiarnia) | desktop | 98 | 100 | 100 | 100 | 0.5 s | 1.0 s | 13 ms | 0 | 0.9 s |
-| [`/pl/kawiarnia`](https://moonpatch.vercel.app/pl/kawiarnia) | mobile | 65 | 100 | 100 | 100 | 2.4 s | 5.0 s | 350 ms | 0 | 6.2 s |
+| [`/pl`](https://moonpatch.vercel.app/pl) | desktop | 98 | 100 | 100 | 100 | 0.5 s | 1.0 s | 0 ms | 0 | 1.2 s |
+| [`/pl`](https://moonpatch.vercel.app/pl) | mobile | 61 | 100 | 100 | 100 | 3.6 s | 6.6 s | 225 ms | 0 | 5.8 s |
+| [`/pl/kawiarnia`](https://moonpatch.vercel.app/pl/kawiarnia) | desktop | 99 | 100 | 100 | 100 | 0.5 s | 0.9 s | 0 ms | 0 | 0.8 s |
+| [`/pl/kawiarnia`](https://moonpatch.vercel.app/pl/kawiarnia) | mobile | 69 | 100 | 100 | 100 | 2.4 s | 5.0 s | 312 ms | 0 | 5.2 s |
 
-Performance in the individual runs: `/pl` desktop 93 / 81 / 96, mobile 56 / 57 / 57; `/pl/kawiarnia` desktop 99 / 98 / 98, mobile 65 / 65 / 65. On both pages the largest element is the wordmark in the header (an SVG painted through a CSS mask): the file itself downloads in under 0.25 s, and almost all of its LCP is render delay. The blocking time on mobile is script evaluation, mostly the React and Next.js framework chunk hydrating the page on a CPU slowed down 4×.
+Performance in the individual runs: `/pl` desktop 98 / 98 / 98, mobile 60 / 61 / 61; `/pl/kawiarnia` desktop 99 / 98 / 99, mobile 72 / 66 / 69. The largest element is text: on `/pl` the language switch in the header, on `/pl/kawiarnia` the room's name on desktop and the look-around hint on mobile. The gate's full-screen poster does not count, as Chrome treats an image covering the whole viewport as a background. The blocking time on mobile is script evaluation, mostly the React and Next.js framework chunk hydrating the page on a CPU slowed down 4×.
 
 ## Development
 
